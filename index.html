@@ -81,6 +81,9 @@
     font: inherit; width: 100%; border: 2px solid var(--line); border-radius: 12px;
     padding: 14px; font-size: 20px; background: #fff; color: var(--ink); min-height: 56px;
   }
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number] { -moz-appearance: textfield; appearance: textfield; }
   input:focus { outline: none; border-color: var(--green-2); box-shadow: 0 0 0 3px rgba(46,125,50,.2); }
   .weight-wrap { position: relative; }
   .weight-wrap input { font-size: 40px; font-weight: 700; text-align: center; padding-right: 54px; min-height: 84px; }
@@ -111,6 +114,29 @@
   #toast.info { background: #37474f; }
   #toast.warn { background: var(--amber); }
   .config-warning { background: var(--red-light); color: var(--red); border: 2px solid var(--red); border-radius: 12px; padding: 14px; font-weight: 600; margin-bottom: 14px; display: none; }
+  .last-box {
+    margin-top: 12px; background: #fff; border: 2px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  }
+  .last-box .lbl { font-size: 14px; color: var(--muted); font-weight: 600; }
+  .last-box .val { font-size: 24px; font-weight: 800; }
+  .last-box .when { font-size: 13px; color: var(--muted); display: block; text-align: right; }
+  .dryback { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .dryback .cell { border: 2px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; }
+  .dryback .cell .lbl { font-size: 13px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+  .dryback .cell .num { font-size: 30px; font-weight: 800; line-height: 1.2; }
+  .dryback .cell .sub { font-size: 13px; color: var(--muted); }
+  .dryback .cell.loss .num { color: var(--amber); }
+  .dryback .cell.gain .num { color: #1565c0; }
+  .dryback .cell.none .num { color: #b0b8b0; }
+  .irr-label { font-size: 14px; font-weight: 700; color: var(--muted); margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+  .irr { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .irr button { background: #fff; border: 2px solid var(--line); color: var(--ink); min-height: 60px; font-size: 19px; }
+  .irr button.on-yes { background: #1565c0; border-color: #1565c0; color: #fff; }
+  .irr button.on-no { background: #455a64; border-color: #455a64; color: #fff; }
+  .reg { margin-top: 12px; display: grid; gap: 10px; }
+  .reg label { font-size: 14px; font-weight: 700; color: var(--muted); display: block; margin-bottom: 4px; }
+  .reg .row button { min-height: 56px; font-size: 18px; }
   .last-saved { font-size: 14px; color: var(--muted); text-align: center; margin-top: 10px; min-height: 18px; }
   .pending-bar { display: none; margin-top: 10px; }
   .pending-bar button { min-height: 48px; font-size: 16px; }
@@ -158,6 +184,15 @@
         <input id="weightInput" type="number" inputmode="decimal" step="0.1" min="0" placeholder="0" aria-label="Weight in grams" disabled>
         <span class="unit">g</span>
       </div>
+      <div id="drybackBox" class="dryback" style="display:none">
+        <div id="dbLast" class="cell none"><div class="lbl">Dryback vs last</div><div class="num">—</div><div class="sub"></div></div>
+        <div id="dbInit" class="cell none"><div class="lbl">Vs initial</div><div class="num">—</div><div class="sub"></div></div>
+      </div>
+      <div class="irr-label">Irrigation</div>
+      <div class="irr" role="group" aria-label="Irrigation">
+        <button id="irrYes" type="button" disabled>💧 Irrigated</button>
+        <button id="irrNo" type="button" disabled>No irrigation</button>
+      </div>
       <div id="weightHint" class="hint"></div>
       <button id="submitBtn" class="btn-submit" type="submit" disabled style="margin-top:12px">Save Weight</button>
     </form>
@@ -190,13 +225,14 @@ const els = {
   reader: $('reader'), scanBtn: $('scanBtn'), stopBtn: $('stopBtn'),
   manualForm: $('manualForm'), manualInput: $('manualInput'),
   trayBox: $('trayBox'), weightForm: $('weightForm'), weightInput: $('weightInput'),
-  weightHint: $('weightHint'), submitBtn: $('submitBtn'), lastSaved: $('lastSaved'),
+  weightHint: $('weightHint'), irrYes: $('irrYes'), irrNo: $('irrNo'), drybackBox: $('drybackBox'), dbLast: $('dbLast'), dbInit: $('dbInit'), submitBtn: $('submitBtn'), lastSaved: $('lastSaved'),
   toast: $('toast'), netBadge: $('netBadge'), configWarning: $('configWarning'),
   pendingBar: $('pendingBar'), pendingCount: $('pendingCount'), retryBtn: $('retryBtn')
 };
 
 const state = {
-  tray: null,          // { barcode, trayName, initialWeight, lastWeight, lastTimestamp }
+  tray: null,          // { barcode, trayName, initialWeight, lastWeight, lastTimestamp, lastIrrigated }
+  irrigated: null,     // true / false / null (not chosen yet)
   scanner: null,
   scanning: false,
   handlingScan: false,
@@ -255,13 +291,17 @@ function apiLookup(barcode) {
   return fetchJson(url, { method: 'GET' });
 }
 
-function apiSave(entry) {
+function apiPost(payload) {
   // text/plain avoids a CORS preflight, which Apps Script does not support
   return fetchJson(WEB_APP_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(entry)
+    body: JSON.stringify(payload)
   });
+}
+function apiSave(entry) { return apiPost({ ...entry, action: 'log' }); }
+function apiAddTray(barcode, trayName, initialWeight) {
+  return apiPost({ action: 'addTray', barcode, trayName, initialWeight });
 }
 
 /* ---------------- Scanner ---------------- */
@@ -355,6 +395,7 @@ async function lookupBarcode(raw) {
 
   const seq = ++state.lookupSeq;
   state.tray = null;
+  state.irrigated = null;
   updateFormState();
   els.manualInput.value = '';
   els.trayBox.className = 'tray loading';
@@ -366,11 +407,7 @@ async function lookupBarcode(raw) {
     if (!data.ok) throw new Error(data.error || 'Lookup failed.');
 
     if (!data.found) {
-      els.trayBox.className = 'tray notfound';
-      els.trayBox.innerHTML =
-        '<div class="tray-name">Unknown tray</div>' +
-        '<div class="tray-meta"><span>Barcode</span><b>' + escapeHtml(barcode) + '</b></div>' +
-        '<div class="hint" style="color:var(--red)">Not found in Trays_Master. Rescan or ask a supervisor to add it.</div>';
+      renderUnknown(barcode);
       buzz([60, 60, 60]);
       toast('Barcode not registered.', 'error', 3500);
       return;
@@ -392,17 +429,80 @@ async function lookupBarcode(raw) {
   }
 }
 
-function renderTray(t) {
+function renderTray(t, isNew) {
   els.trayBox.className = 'tray found';
-  let meta =
+  const meta =
     '<span>Barcode</span><b>' + escapeHtml(t.barcode) + '</b>' +
     '<span>Initial</span><b>' + fmtG(t.initialWeight) + '</b>';
-  if (t.lastWeight !== null && t.lastWeight !== undefined) {
-    meta += '<span>Last</span><b>' + fmtG(t.lastWeight) + ' · ' + escapeHtml(fmtDate(t.lastTimestamp)) + '</b>';
-  }
+  const hasLast = t.lastWeight !== null && t.lastWeight !== undefined;
+  const lastBox =
+    '<div class="last-box"><span class="lbl">Last recorded</span><span>' +
+    (hasLast
+      ? '<span class="val">' + fmtG(t.lastWeight) + '</span><span class="when">' + escapeHtml(fmtDate(t.lastTimestamp)) +
+        (t.lastIrrigated === 'Yes' ? ' · 💧 irrigated' : t.lastIrrigated === 'No' ? ' · not irrigated' : '') + '</span>'
+      : '<span class="lbl">No weighings yet</span>') +
+    '</span></div>';
   els.trayBox.innerHTML =
     '<div class="tray-name">✓ ' + escapeHtml(t.trayName) + '</div>' +
-    '<div class="tray-meta">' + meta + '</div>';
+    (isNew ? '<div class="hint ok" style="margin:0 0 6px">New tray registered</div>' : '') +
+    '<div class="tray-meta">' + meta + '</div>' + lastBox;
+}
+
+/* ---------------- Unknown tray + registration ---------------- */
+function renderUnknown(barcode) {
+  els.trayBox.className = 'tray notfound';
+  els.trayBox.innerHTML =
+    '<div class="tray-name">Unknown tray</div>' +
+    '<div class="tray-meta"><span>Barcode</span><b>' + escapeHtml(barcode) + '</b></div>' +
+    '<div class="hint" style="color:var(--red)">Not found in Trays_Master.</div>' +
+    '<button id="regOpenBtn" type="button" class="btn-primary" style="margin-top:10px">➕ Register this tray</button>';
+  $('regOpenBtn').addEventListener('click', () => renderRegisterForm(barcode));
+}
+
+function renderRegisterForm(barcode) {
+  els.trayBox.className = 'tray';
+  els.trayBox.innerHTML =
+    '<div class="tray-name" style="font-size:22px">New tray</div>' +
+    '<div class="tray-meta"><span>Barcode</span><b>' + escapeHtml(barcode) + '</b></div>' +
+    '<form id="regForm" class="reg" autocomplete="off">' +
+      '<div><label for="regName">Tray name *</label>' +
+      '<input id="regName" type="text" maxlength="120" required></div>' +
+      '<div><label for="regWeight">Initial weight (g) – optional</label>' +
+      '<input id="regWeight" type="number" inputmode="decimal" step="0.1" min="0"></div>' +
+      '<div class="row">' +
+        '<button id="regCancel" type="button" class="btn-secondary">Cancel</button>' +
+        '<button id="regSave" type="submit" class="btn-primary">Save tray</button>' +
+      '</div>' +
+    '</form>';
+  $('regCancel').addEventListener('click', () => renderUnknown(barcode));
+  $('regForm').addEventListener('submit', (e) => submitRegister(e, barcode));
+  setTimeout(() => { const n = $('regName'); if (n) n.focus(); }, 100);
+}
+
+async function submitRegister(e, barcode) {
+  e.preventDefault();
+  const name = $('regName').value.trim();
+  const wRaw = $('regWeight').value.trim().replace(',', '.');
+  if (!name) { toast('Enter a tray name.', 'error'); $('regName').focus(); return; }
+  if (wRaw && !(parseFloat(wRaw) > 0)) { toast('Initial weight must be a positive number.', 'error'); return; }
+
+  const btn = $('regSave');
+  btn.disabled = true; $('regCancel').disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Saving…';
+  try {
+    const res = await apiAddTray(barcode, name, wRaw ? parseFloat(wRaw) : '');
+    if (!res.ok) throw new Error(res.error || 'Could not register tray.');
+    buzz(120);
+    toast('✓ Tray registered: ' + res.trayName, 'success', 2500);
+    state.tray = res;
+    renderTray(res, true);
+    updateFormState();
+    setTimeout(() => els.weightInput.focus(), 150);
+  } catch (err) {
+    toast(err.network ? 'No connection – registering a tray needs internet.' : 'Error: ' + err.message, 'error', 5000);
+    btn.disabled = false; $('regCancel').disabled = false;
+    btn.textContent = 'Save tray';
+  }
 }
 
 /* ---------------- Weight input ---------------- */
@@ -414,33 +514,63 @@ function currentWeight() {
 function updateFormState() {
   const hasTray = !!state.tray;
   els.weightInput.disabled = !hasTray || state.submitting;
+  els.irrYes.disabled = els.irrNo.disabled = !hasTray || state.submitting;
+  els.irrYes.className = state.irrigated === true ? 'on-yes' : '';
+  els.irrNo.className = state.irrigated === false ? 'on-no' : '';
   const w = currentWeight();
-  const valid = hasTray && w > 0 && w <= 100000;
+  const valid = hasTray && w > 0 && w <= 100000 && state.irrigated !== null;
   els.submitBtn.disabled = !valid || state.submitting;
   updateWeightHint(w);
+  if (hasTray && w > 0 && state.irrigated === null && !els.weightHint.textContent) {
+    els.weightHint.className = 'hint warn';
+    els.weightHint.textContent = 'Choose irrigation: 💧 Irrigated or No irrigation.';
+  }
+}
+
+/* Dryback % = (reference - current) / reference × 100. Positive = weight lost. */
+function drybackPct(ref, w) {
+  if (!(ref > 0) || !(w > 0)) return null;
+  return (ref - w) / ref * 100;
+}
+
+function setDbCell(cell, ref, w, label) {
+  const num = cell.querySelector('.num');
+  const sub = cell.querySelector('.sub');
+  const pct = drybackPct(ref, w);
+  if (pct === null) {
+    cell.className = 'cell none';
+    num.textContent = '—';
+    sub.textContent = ref > 0 ? fmtG(ref) : 'no ' + label;
+    return;
+  }
+  const diff = w - ref;
+  if (pct >= 0) { cell.className = 'cell loss'; num.textContent = pct.toFixed(1) + '%'; }
+  else { cell.className = 'cell gain'; num.textContent = '+' + Math.abs(pct).toFixed(1) + '%'; }
+  sub.textContent = (diff >= 0 ? '+' : '−') + Math.abs(diff).toFixed(1) + ' g · from ' + fmtG(ref);
 }
 
 function updateWeightHint(w) {
   const t = state.tray;
   els.weightHint.className = 'hint';
   els.weightHint.textContent = '';
-  if (!t || !(w > 0)) return;
-  const parts = [];
-  if (t.initialWeight > 0) {
-    const d = w - t.initialWeight;
-    parts.push((d >= 0 ? '+' : '') + d.toFixed(1) + ' g vs initial');
-  }
+  if (!t) { els.drybackBox.style.display = 'none'; return; }
+
+  els.drybackBox.style.display = 'grid';
+  setDbCell(els.dbLast, t.lastWeight, w, 'previous weight');
+  setDbCell(els.dbInit, t.initialWeight, w, 'initial weight');
+
   const ref = (t.lastWeight > 0) ? t.lastWeight : (t.initialWeight > 0 ? t.initialWeight : null);
-  if (ref) {
-    const pct = Math.abs(w - ref) / ref * 100;
-    if (pct > BIG_CHANGE_WARN_PCT) {
-      els.weightHint.className = 'hint warn';
-      els.weightHint.textContent = '⚠ ' + pct.toFixed(0) + '% different from ' + (t.lastWeight > 0 ? 'last' : 'initial') + ' weight — double-check.';
-      return;
-    }
+  const pct = drybackPct(ref, w);
+  if (pct !== null && Math.abs(pct) > BIG_CHANGE_WARN_PCT) {
+    els.weightHint.className = 'hint warn';
+    els.weightHint.textContent = '⚠ ' + Math.abs(pct).toFixed(0) + '% different from ' + (t.lastWeight > 0 ? 'last' : 'initial') + ' weight — double-check.';
   }
-  els.weightHint.className = 'hint ok';
-  els.weightHint.textContent = parts.join(' · ');
+}
+
+function setIrrigated(v) {
+  state.irrigated = (state.irrigated === v) ? null : v; // tap again to clear
+  buzz(30);
+  updateFormState();
 }
 
 /* ---------------- Submit ---------------- */
@@ -454,10 +584,12 @@ async function submitWeight(e) {
   if (state.submitting || !state.tray) return;
   const w = currentWeight();
   if (!(w > 0)) { toast('Enter a valid weight.', 'error'); return; }
+  if (state.irrigated === null) { toast('Choose irrigation: yes or no.', 'error'); return; }
 
   const entry = {
     barcode: state.tray.barcode,
     weight: Math.round(w * 10) / 10,
+    irrigated: state.irrigated,
     clientTimestamp: new Date().toISOString(),
     submissionId: newId()
   };
@@ -471,8 +603,12 @@ async function submitWeight(e) {
     const res = await apiSave(entry);
     if (!res.ok) throw new Error(res.error || 'Save failed.');
     buzz(150);
-    toast('✓ Saved ' + fmtG(entry.weight) + ' — ' + trayName, 'success', 2500);
-    els.lastSaved.textContent = 'Last saved: ' + trayName + ' · ' + fmtG(entry.weight) + ' · ' + fmtDate(entry.clientTimestamp);
+    const db = (res.dryback !== null && res.dryback !== undefined)
+      ? ' · dryback ' + (res.dryback >= 0 ? res.dryback.toFixed(1) + '%' : '+' + Math.abs(res.dryback).toFixed(1) + '% gain')
+      : '';
+    const irr = entry.irrigated ? ' · 💧' : '';
+    toast('✓ Saved ' + fmtG(entry.weight) + db + irr + ' — ' + trayName, 'success', 3000);
+    els.lastSaved.textContent = 'Last saved: ' + trayName + ' · ' + fmtG(entry.weight) + db + irr + ' · ' + fmtDate(entry.clientTimestamp);
     finishEntry();
   } catch (err) {
     if (err.network) {
@@ -494,6 +630,7 @@ async function submitWeight(e) {
 
 function finishEntry() {
   state.tray = null;
+  state.irrigated = null;
   els.weightInput.value = '';
   els.weightInput.blur();
   els.trayBox.className = 'tray';
@@ -571,6 +708,8 @@ els.manualForm.addEventListener('submit', (e) => {
   lookupBarcode(v);
 });
 els.weightInput.addEventListener('input', updateFormState);
+els.irrYes.addEventListener('click', () => setIrrigated(true));
+els.irrNo.addEventListener('click', () => setIrrigated(false));
 els.weightForm.addEventListener('submit', submitWeight);
 els.retryBtn.addEventListener('click', () => flushPending(true));
 window.addEventListener('online', () => { updateNetBadge(); flushPending(); });
