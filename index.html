@@ -137,6 +137,17 @@
   .reg { margin-top: 12px; display: grid; gap: 10px; }
   .reg label { font-size: 14px; font-weight: 700; color: var(--muted); display: block; margin-bottom: 4px; }
   .reg .row button { min-height: 56px; font-size: 18px; }
+  .cut-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    border: 2px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;
+  }
+  .cut-row .m { font-size: 19px; font-weight: 800; word-break: break-word; }
+  .cut-row .d { font-size: 14px; color: var(--muted); }
+  .cut-row .pct { font-size: 22px; font-weight: 800; color: var(--green-2); white-space: nowrap; }
+  .cut-row .pct.pending { font-size: 14px; color: var(--amber); font-weight: 700; }
+  .cut-row button { width: auto; min-height: 44px; font-size: 15px; padding: 0 12px; }
+  .cut-total { font-size: 15px; color: var(--muted); font-weight: 600; margin: 4px 0 10px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .last-saved { font-size: 14px; color: var(--muted); text-align: center; margin-top: 10px; min-height: 18px; }
   .pending-bar { display: none; margin-top: 10px; }
   .pending-bar button { min-height: 48px; font-size: 16px; }
@@ -201,6 +212,33 @@
       <button id="retryBtn" class="btn-secondary" type="button">↻ Send <span id="pendingCount">0</span> saved-offline entries</button>
     </div>
   </section>
+
+  <!-- STEP 4: CUTTINGS -->
+  <section class="card" id="cutCard" style="display:none">
+    <p class="step">4 · Cuttings &amp; rooting</p>
+    <div id="cutTotal" class="cut-total"></div>
+    <div id="cutList"></div>
+    <button id="cutAddBtn" class="btn-secondary" type="button">➕ Add cuttings</button>
+    <form id="cutForm" class="reg" style="display:none" autocomplete="off">
+      <div id="cutFormTitle" class="tray-name" style="font-size:20px;margin:0">Add cuttings</div>
+      <div>
+        <label for="cutMother">Mother (optional)</label>
+        <input id="cutMother" type="text" list="motherList" maxlength="80" placeholder="e.g. M12">
+        <datalist id="motherList"></datalist>
+      </div>
+      <div class="grid2">
+        <div><label for="cutInitial">Initial cuttings</label>
+          <input id="cutInitial" type="number" inputmode="numeric" min="1" step="1"></div>
+        <div><label for="cutRooted">Rooted</label>
+          <input id="cutRooted" type="number" inputmode="numeric" min="0" step="1" placeholder="later"></div>
+      </div>
+      <div id="cutHint" class="hint"></div>
+      <div class="row">
+        <button id="cutCancel" type="button" class="btn-secondary">Cancel</button>
+        <button id="cutSave" type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </section>
 </main>
 
 <div id="toast" role="status" aria-live="polite"></div>
@@ -227,12 +265,17 @@ const els = {
   trayBox: $('trayBox'), weightForm: $('weightForm'), weightInput: $('weightInput'),
   weightHint: $('weightHint'), irrYes: $('irrYes'), irrNo: $('irrNo'), drybackBox: $('drybackBox'), dbLast: $('dbLast'), dbInit: $('dbInit'), submitBtn: $('submitBtn'), lastSaved: $('lastSaved'),
   toast: $('toast'), netBadge: $('netBadge'), configWarning: $('configWarning'),
+  cutCard: $('cutCard'), cutTotal: $('cutTotal'), cutList: $('cutList'), cutAddBtn: $('cutAddBtn'),
+  cutForm: $('cutForm'), cutFormTitle: $('cutFormTitle'), cutMother: $('cutMother'), motherList: $('motherList'),
+  cutInitial: $('cutInitial'), cutRooted: $('cutRooted'), cutHint: $('cutHint'), cutCancel: $('cutCancel'), cutSave: $('cutSave'),
   pendingBar: $('pendingBar'), pendingCount: $('pendingCount'), retryBtn: $('retryBtn')
 };
 
 const state = {
   tray: null,          // { barcode, trayName, initialWeight, lastWeight, lastTimestamp, lastIrrigated }
   irrigated: null,     // true / false / null (not chosen yet)
+  mothers: [],         // all mother names used so far (for suggestions)
+  cutEdit: null,       // batch being edited, or null for a new batch
   scanner: null,
   scanning: false,
   handlingScan: false,
@@ -300,6 +343,9 @@ function apiPost(payload) {
   });
 }
 function apiSave(entry) { return apiPost({ ...entry, action: 'log' }); }
+function apiSetCuttings(barcode, mother, initial, rooted) {
+  return apiPost({ action: 'setCuttings', barcode, mother, initial, rooted });
+}
 function apiAddTray(barcode, trayName, initialWeight) {
   return apiPost({ action: 'addTray', barcode, trayName, initialWeight });
 }
@@ -396,6 +442,7 @@ async function lookupBarcode(raw) {
   const seq = ++state.lookupSeq;
   state.tray = null;
   state.irrigated = null;
+  renderCuttings();
   updateFormState();
   els.manualInput.value = '';
   els.trayBox.className = 'tray loading';
@@ -414,7 +461,9 @@ async function lookupBarcode(raw) {
     }
 
     state.tray = data;
+    if (data.mothers) state.mothers = data.mothers;
     renderTray(data);
+    renderCuttings();
     updateFormState();
     toast('Tray found: ' + data.trayName, 'success', 1800);
     setTimeout(() => els.weightInput.focus(), 150);
@@ -495,13 +544,130 @@ async function submitRegister(e, barcode) {
     buzz(120);
     toast('✓ Tray registered: ' + res.trayName, 'success', 2500);
     state.tray = res;
+    if (res.mothers) state.mothers = res.mothers;
     renderTray(res, true);
+    renderCuttings();
     updateFormState();
     setTimeout(() => els.weightInput.focus(), 150);
   } catch (err) {
     toast(err.network ? 'No connection – registering a tray needs internet.' : 'Error: ' + err.message, 'error', 5000);
     btn.disabled = false; $('regCancel').disabled = false;
     btn.textContent = 'Save tray';
+  }
+}
+
+/* ---------------- Cuttings & rooting ---------------- */
+function renderCuttings() {
+  const t = state.tray;
+  closeCutForm();
+  if (!t) { els.cutCard.style.display = 'none'; return; }
+  els.cutCard.style.display = 'block';
+
+  els.motherList.innerHTML = state.mothers.map((m) => '<option value="' + escapeHtml(m) + '">').join('');
+
+  const list = t.cuttings || [];
+  if (!list.length) {
+    els.cutTotal.textContent = '';
+    els.cutList.innerHTML = '<div class="placeholder" style="margin-bottom:10px">No cuttings recorded for this tray.</div>';
+    return;
+  }
+  let init = 0, rooted = 0, counted = 0;
+  list.forEach((b) => { init += b.initial || 0; if (b.rooted !== null) { rooted += b.rooted; counted += b.initial || 0; } });
+  els.cutTotal.textContent = 'Tray total: ' + init + ' cuttings' +
+    (counted ? ' · rooted ' + rooted + '/' + counted + ' (' + (rooted / counted * 100).toFixed(1) + '%)' : '');
+
+  els.cutList.innerHTML = '';
+  list.forEach((b, i) => {
+    const row = document.createElement('div');
+    row.className = 'cut-row';
+    const pct = b.rooted !== null
+      ? '<div class="pct">' + (b.rootingPct !== null ? b.rootingPct.toFixed(1) : '0') + '%</div>'
+      : '<div class="pct pending">not counted</div>';
+    row.innerHTML =
+      '<div><div class="m">' + escapeHtml(b.mother || 'No mother') + '</div>' +
+      '<div class="d">' + b.initial + ' cuttings' + (b.rooted !== null ? ' · ' + b.rooted + ' rooted' : '') + '</div></div>' +
+      pct + '<button type="button" class="btn-secondary">' + (b.rooted !== null ? 'Edit' : 'Rooted') + '</button>';
+    row.querySelector('button').addEventListener('click', () => openCutForm(list[i]));
+    els.cutList.appendChild(row);
+  });
+}
+
+function openCutForm(batch) {
+  state.cutEdit = batch || null;
+  els.cutForm.style.display = 'grid';
+  els.cutAddBtn.style.display = 'none';
+  els.cutHint.textContent = ''; els.cutHint.className = 'hint';
+  if (batch) {
+    els.cutFormTitle.textContent = 'Update: ' + (batch.mother || 'No mother');
+    els.cutMother.value = batch.mother || '';
+    els.cutMother.disabled = true;
+    els.cutInitial.value = batch.initial ?? '';
+    els.cutRooted.value = batch.rooted ?? '';
+    setTimeout(() => els.cutRooted.focus(), 100);
+  } else {
+    els.cutFormTitle.textContent = 'Add cuttings';
+    els.cutMother.value = '';
+    els.cutMother.disabled = false;
+    els.cutInitial.value = '';
+    els.cutRooted.value = '';
+    setTimeout(() => els.cutMother.focus(), 100);
+  }
+  updateCutHint();
+}
+
+function closeCutForm() {
+  state.cutEdit = null;
+  els.cutForm.style.display = 'none';
+  els.cutAddBtn.style.display = 'flex';
+  els.cutMother.disabled = false;
+  els.cutSave.disabled = false; els.cutCancel.disabled = false;
+  els.cutSave.textContent = 'Save';
+}
+
+function readCount(input) {
+  const v = input.value.trim();
+  if (v === '') return null;
+  const n = Number(v);
+  return (Number.isInteger(n) && n >= 0) ? n : NaN;
+}
+
+function updateCutHint() {
+  const i = readCount(els.cutInitial), r = readCount(els.cutRooted);
+  els.cutHint.className = 'hint'; els.cutHint.textContent = '';
+  if (Number.isNaN(i) || Number.isNaN(r)) { els.cutHint.className = 'hint warn'; els.cutHint.textContent = 'Use whole numbers only.'; return; }
+  if (i !== null && r !== null) {
+    if (r > i) { els.cutHint.className = 'hint warn'; els.cutHint.textContent = 'Rooted cannot be more than initial.'; return; }
+    if (i > 0) { els.cutHint.className = 'hint ok'; els.cutHint.textContent = 'Rooting: ' + (r / i * 100).toFixed(1) + '%'; }
+  }
+}
+
+async function submitCuttings(e) {
+  e.preventDefault();
+  if (!state.tray) return;
+  const mother = state.cutEdit ? (state.cutEdit.mother || '') : els.cutMother.value.trim();
+  const initial = readCount(els.cutInitial), rooted = readCount(els.cutRooted);
+  if (Number.isNaN(initial) || Number.isNaN(rooted)) { toast('Use whole numbers only.', 'error'); return; }
+  if (!state.cutEdit && !(initial >= 1)) { toast('Enter the initial number of cuttings.', 'error'); els.cutInitial.focus(); return; }
+  if (initial !== null && rooted !== null && rooted > initial) { toast('Rooted cannot be more than initial.', 'error'); return; }
+  if (!state.cutEdit) {
+    const dup = (state.tray.cuttings || []).find((b) => (b.mother || '').toLowerCase() === mother.toLowerCase());
+    if (dup) { toast('This mother is already in the tray – tap its Edit/Rooted button.', 'warn', 4000); return; }
+  }
+
+  els.cutSave.disabled = true; els.cutCancel.disabled = true;
+  els.cutSave.innerHTML = '<span class="spinner"></span> Saving…';
+  try {
+    const res = await apiSetCuttings(state.tray.barcode, mother, initial === null ? '' : initial, rooted === null ? '' : rooted);
+    if (!res.ok) throw new Error(res.error || 'Could not save cuttings.');
+    buzz(100);
+    state.tray.cuttings = res.cuttings || [];
+    if (res.mothers) state.mothers = res.mothers;
+    toast('✓ Cuttings saved' + (mother ? ' – ' + mother : ''), 'success', 2200);
+    renderCuttings();
+  } catch (err) {
+    toast(err.network ? 'No connection – cuttings need internet to save.' : 'Error: ' + err.message, 'error', 5000);
+    els.cutSave.disabled = false; els.cutCancel.disabled = false;
+    els.cutSave.textContent = 'Save';
   }
 }
 
@@ -631,6 +797,7 @@ async function submitWeight(e) {
 function finishEntry() {
   state.tray = null;
   state.irrigated = null;
+  renderCuttings();
   els.weightInput.value = '';
   els.weightInput.blur();
   els.trayBox.className = 'tray';
@@ -709,6 +876,11 @@ els.manualForm.addEventListener('submit', (e) => {
 });
 els.weightInput.addEventListener('input', updateFormState);
 els.irrYes.addEventListener('click', () => setIrrigated(true));
+els.cutAddBtn.addEventListener('click', () => openCutForm(null));
+els.cutCancel.addEventListener('click', closeCutForm);
+els.cutForm.addEventListener('submit', submitCuttings);
+els.cutInitial.addEventListener('input', updateCutHint);
+els.cutRooted.addEventListener('input', updateCutHint);
 els.irrNo.addEventListener('click', () => setIrrigated(false));
 els.weightForm.addEventListener('submit', submitWeight);
 els.retryBtn.addEventListener('click', () => flushPending(true));
