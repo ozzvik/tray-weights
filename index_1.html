@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b5e20">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Tray Weights</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root {
+    --green: #1b5e20;
+    --green-2: #2e7d32;
+    --green-light: #e8f5e9;
+    --red: #c62828;
+    --red-light: #ffebee;
+    --amber: #ef6c00;
+    --amber-light: #fff3e0;
+    --ink: #1a1a1a;
+    --muted: #5f6b5f;
+    --line: #d5dcd5;
+    --bg: #f3f6f3;
+    --card: #ffffff;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 18px;
+    line-height: 1.35;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  header {
+    background: var(--green);
+    color: #fff;
+    padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { font-size: 20px; margin: 0; font-weight: 700; }
+  .badge {
+    font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+    background: rgba(255,255,255,.18); white-space: nowrap;
+  }
+  .badge.offline { background: var(--red); }
+  .badge.pending { background: var(--amber); }
+  main { max-width: 560px; margin: 0 auto; padding: 14px 14px 40px; }
+  .card {
+    background: var(--card); border-radius: var(--radius); padding: 16px;
+    margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  .step { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 0 0 10px; }
+  #reader {
+    width: 100%; border-radius: 10px; overflow: hidden; background: #000;
+    display: none; margin-bottom: 12px;
+  }
+  #reader.active { display: block; }
+  #reader video { width: 100% !important; height: auto !important; display: block; }
+  button {
+    font: inherit; border: 0; border-radius: 12px; cursor: pointer;
+    min-height: 60px; width: 100%; font-weight: 700; font-size: 20px;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    transition: transform .05s, opacity .2s;
+  }
+  button:active { transform: scale(.98); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-primary { background: var(--green-2); color: #fff; }
+  .btn-secondary { background: #eef2ee; color: var(--ink); border: 2px solid var(--line); }
+  .btn-danger { background: var(--red-light); color: var(--red); border: 2px solid #f3c1c1; }
+  .btn-submit { background: var(--green); color: #fff; min-height: 72px; font-size: 24px; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  .manual { display: flex; gap: 8px; margin-top: 12px; }
+  .manual input { flex: 1; }
+  .manual button { width: auto; min-width: 96px; font-size: 17px; min-height: 56px; padding: 0 14px; }
+  input {
+    font: inherit; width: 100%; border: 2px solid var(--line); border-radius: 12px;
+    padding: 14px; font-size: 20px; background: #fff; color: var(--ink); min-height: 56px;
+  }
+  input:focus { outline: none; border-color: var(--green-2); box-shadow: 0 0 0 3px rgba(46,125,50,.2); }
+  .weight-wrap { position: relative; }
+  .weight-wrap input { font-size: 40px; font-weight: 700; text-align: center; padding-right: 54px; min-height: 84px; }
+  .weight-wrap .unit { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); font-size: 24px; font-weight: 700; color: var(--muted); pointer-events: none; }
+  .tray { border: 2px solid var(--line); border-radius: 12px; padding: 14px; min-height: 70px; }
+  .tray.found { border-color: var(--green-2); background: var(--green-light); }
+  .tray.notfound { border-color: var(--red); background: var(--red-light); }
+  .tray.loading { border-style: dashed; }
+  .tray-name { font-size: 26px; font-weight: 800; margin: 2px 0 6px; word-break: break-word; }
+  .tray-meta { font-size: 15px; color: var(--muted); display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; }
+  .tray-meta b { color: var(--ink); font-weight: 600; }
+  .placeholder { color: var(--muted); font-size: 16px; }
+  .hint { font-size: 15px; margin-top: 8px; min-height: 20px; font-weight: 600; }
+  .hint.warn { color: var(--amber); }
+  .hint.ok { color: var(--green-2); }
+  .spinner { width: 22px; height: 22px; border: 3px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; }
+  .spinner.dark { border-color: rgba(0,0,0,.15); border-top-color: var(--green-2); display: inline-block; vertical-align: middle; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #toast {
+    position: fixed; left: 12px; right: 12px; bottom: calc(16px + env(safe-area-inset-bottom));
+    max-width: 536px; margin: 0 auto; padding: 18px 20px; border-radius: 14px;
+    color: #fff; font-size: 19px; font-weight: 700; box-shadow: 0 6px 24px rgba(0,0,0,.25);
+    transform: translateY(150%); transition: transform .25s ease; z-index: 50;
+  }
+  #toast.show { transform: translateY(0); }
+  #toast.success { background: var(--green); }
+  #toast.error { background: var(--red); }
+  #toast.info { background: #37474f; }
+  #toast.warn { background: var(--amber); }
+  .config-warning { background: var(--red-light); color: var(--red); border: 2px solid var(--red); border-radius: 12px; padding: 14px; font-weight: 600; margin-bottom: 14px; display: none; }
+  .last-saved { font-size: 14px; color: var(--muted); text-align: center; margin-top: 10px; min-height: 18px; }
+  .pending-bar { display: none; margin-top: 10px; }
+  .pending-bar button { min-height: 48px; font-size: 16px; }
+  /* hide html5-qrcode's own extra UI bits */
+  #reader__dashboard_section_csr, #reader__header_message { display: none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🌱 Tray Weights</h1>
+  <span id="netBadge" class="badge">Online</span>
+</header>
+
+<main>
+  <div id="configWarning" class="config-warning">
+    Setup needed: paste your Google Apps Script Web App URL into <code>WEB_APP_URL</code> in this file.
+  </div>
+
+  <!-- STEP 1: SCAN -->
+  <section class="card">
+    <p class="step">1 · Scan tray</p>
+    <div id="reader"></div>
+    <button id="scanBtn" class="btn-primary" type="button">📷 Scan Barcode</button>
+    <button id="stopBtn" class="btn-danger" type="button" style="display:none">✕ Stop Camera</button>
+    <form id="manualForm" class="manual" autocomplete="off">
+      <input id="manualInput" type="text" inputmode="text" placeholder="…or type barcode" aria-label="Barcode">
+      <button class="btn-secondary" type="submit">Find</button>
+    </form>
+  </section>
+
+  <!-- STEP 2: CONFIRM TRAY -->
+  <section class="card">
+    <p class="step">2 · Check tray</p>
+    <div id="trayBox" class="tray">
+      <div class="placeholder">No tray scanned yet.</div>
+    </div>
+  </section>
+
+  <!-- STEP 3: WEIGHT + SUBMIT -->
+  <section class="card">
+    <p class="step">3 · Enter weight</p>
+    <form id="weightForm" autocomplete="off">
+      <div class="weight-wrap">
+        <input id="weightInput" type="number" inputmode="decimal" step="0.1" min="0" placeholder="0" aria-label="Weight in grams" disabled>
+        <span class="unit">g</span>
+      </div>
+      <div id="weightHint" class="hint"></div>
+      <button id="submitBtn" class="btn-submit" type="submit" disabled style="margin-top:12px">Save Weight</button>
+    </form>
+    <div id="lastSaved" class="last-saved"></div>
+    <div id="pendingBar" class="pending-bar">
+      <button id="retryBtn" class="btn-secondary" type="button">↻ Send <span id="pendingCount">0</span> saved-offline entries</button>
+    </div>
+  </section>
+</main>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* =====================================================================
+   CONFIGURATION — paste your deployed Apps Script Web App URL here.
+   It looks like: https://script.google.com/macros/s/AKfy..../exec
+   ===================================================================== */
+const WEB_APP_URL = 'PASTE_YOUR_WEB_APP_URL_HERE';
+
+/* Options */
+const AUTO_RESTART_SCANNER = true;   // reopen camera after each successful save
+const BIG_CHANGE_WARN_PCT = 40;      // warn if weight differs from last by more than this %
+const REQUEST_TIMEOUT_MS = 20000;
+const PENDING_KEY = 'trayWeights.pending.v1';
+
+/* ===================================================================== */
+
+const $ = (id) => document.getElementById(id);
+const els = {
+  reader: $('reader'), scanBtn: $('scanBtn'), stopBtn: $('stopBtn'),
+  manualForm: $('manualForm'), manualInput: $('manualInput'),
+  trayBox: $('trayBox'), weightForm: $('weightForm'), weightInput: $('weightInput'),
+  weightHint: $('weightHint'), submitBtn: $('submitBtn'), lastSaved: $('lastSaved'),
+  toast: $('toast'), netBadge: $('netBadge'), configWarning: $('configWarning'),
+  pendingBar: $('pendingBar'), pendingCount: $('pendingCount'), retryBtn: $('retryBtn')
+};
+
+const state = {
+  tray: null,          // { barcode, trayName, initialWeight, lastWeight, lastTimestamp }
+  scanner: null,
+  scanning: false,
+  handlingScan: false,
+  submitting: false,
+  lookupSeq: 0
+};
+
+const isConfigured = () => /^https:\/\/script\.google\.com\/.+\/exec$/.test(WEB_APP_URL.trim());
+
+/* ---------------- Notifications ---------------- */
+let toastTimer;
+function toast(msg, type = 'info', ms = 3000) {
+  els.toast.textContent = msg;
+  els.toast.className = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { els.toast.className = type; }, ms);
+}
+function buzz(pattern) { try { navigator.vibrate && navigator.vibrate(pattern); } catch (e) {} }
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function fmtG(n) {
+  if (n === null || n === undefined || n === '' || isNaN(Number(n))) return '—';
+  return Number(n).toLocaleString(undefined, { maximumFractionDigits: 1 }) + ' g';
+}
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return String(iso);
+  return d.toLocaleString(undefined, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+/* ---------------- Network helpers ---------------- */
+async function fetchJson(url, options = {}) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { ...options, signal: ctrl.signal, redirect: 'follow' });
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); }
+    catch (e) { throw new Error('Unexpected server reply. Check the Web App is deployed with access "Anyone".'); }
+    return data;
+  } catch (err) {
+    if (err.name === 'AbortError') { const e = new Error('Request timed out.'); e.network = true; throw e; }
+    if (err instanceof TypeError) { const e = new Error('No connection to server.'); e.network = true; throw e; }
+    throw err;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+function apiLookup(barcode) {
+  const url = WEB_APP_URL + '?action=lookup&barcode=' + encodeURIComponent(barcode) + '&t=' + Date.now();
+  return fetchJson(url, { method: 'GET' });
+}
+
+function apiSave(entry) {
+  // text/plain avoids a CORS preflight, which Apps Script does not support
+  return fetchJson(WEB_APP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(entry)
+  });
+}
+
+/* ---------------- Scanner ---------------- */
+function buildScanner() {
+  const F = window.Html5QrcodeSupportedFormats;
+  const formats = F ? [
+    F.CODE_128, F.CODE_39, F.CODE_93, F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E,
+    F.ITF, F.CODABAR, F.QR_CODE, F.DATA_MATRIX
+  ] : undefined;
+  return new Html5Qrcode('reader', {
+    verbose: false,
+    formatsToSupport: formats,
+    experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+  });
+}
+
+async function startScanner() {
+  if (state.scanning) return;
+  if (!window.Html5Qrcode) {
+    toast('Scanner library failed to load. Check internet, or type the barcode.', 'error', 5000);
+    return;
+  }
+  if (!window.isSecureContext) {
+    toast('Camera needs HTTPS. Open this page from an https:// address.', 'error', 6000);
+    return;
+  }
+  try {
+    if (!state.scanner) state.scanner = buildScanner();
+    els.reader.classList.add('active');
+    els.scanBtn.style.display = 'none';
+    els.stopBtn.style.display = 'flex';
+    state.handlingScan = false;
+
+    await state.scanner.start(
+      { facingMode: 'environment' },
+      {
+        fps: 12,
+        // wide box suits 1D barcodes on tray labels
+        qrbox: (w, h) => {
+          const width = Math.max(150, Math.floor(w * 0.88));
+          const height = Math.max(80, Math.floor(Math.min(h, w) * 0.5));
+          return { width, height };
+        },
+        aspectRatio: 1.333,
+        disableFlip: false
+      },
+      onScanSuccess,
+      () => {} // per-frame "not found" — ignore
+    );
+    state.scanning = true;
+  } catch (err) {
+    resetScannerUi();
+    const msg = String(err && (err.message || err)).toLowerCase();
+    if (msg.includes('permission') || msg.includes('notallowed')) {
+      toast('Camera permission denied. Allow camera access in browser settings.', 'error', 6000);
+    } else if (msg.includes('notfound') || msg.includes('no camera')) {
+      toast('No camera found on this device.', 'error', 5000);
+    } else {
+      toast('Could not start camera: ' + (err.message || err), 'error', 6000);
+    }
+  }
+}
+
+async function stopScanner() {
+  try {
+    if (state.scanner && state.scanning) await state.scanner.stop();
+  } catch (e) { /* already stopped */ }
+  state.scanning = false;
+  resetScannerUi();
+}
+
+function resetScannerUi() {
+  els.reader.classList.remove('active');
+  els.scanBtn.style.display = 'flex';
+  els.stopBtn.style.display = 'none';
+}
+
+async function onScanSuccess(decodedText) {
+  if (state.handlingScan) return;
+  state.handlingScan = true;
+  buzz(80);
+  await stopScanner();
+  lookupBarcode(decodedText);
+}
+
+/* ---------------- Lookup ---------------- */
+async function lookupBarcode(raw) {
+  const barcode = String(raw || '').trim();
+  if (!barcode) return;
+  if (!isConfigured()) { toast('WEB_APP_URL is not set in index.html.', 'error', 5000); return; }
+
+  const seq = ++state.lookupSeq;
+  state.tray = null;
+  updateFormState();
+  els.manualInput.value = '';
+  els.trayBox.className = 'tray loading';
+  els.trayBox.innerHTML = '<span class="spinner dark"></span> Looking up <b>' + escapeHtml(barcode) + '</b>…';
+
+  try {
+    const data = await apiLookup(barcode);
+    if (seq !== state.lookupSeq) return; // a newer scan superseded this one
+    if (!data.ok) throw new Error(data.error || 'Lookup failed.');
+
+    if (!data.found) {
+      els.trayBox.className = 'tray notfound';
+      els.trayBox.innerHTML =
+        '<div class="tray-name">Unknown tray</div>' +
+        '<div class="tray-meta"><span>Barcode</span><b>' + escapeHtml(barcode) + '</b></div>' +
+        '<div class="hint" style="color:var(--red)">Not found in Trays_Master. Rescan or ask a supervisor to add it.</div>';
+      buzz([60, 60, 60]);
+      toast('Barcode not registered.', 'error', 3500);
+      return;
+    }
+
+    state.tray = data;
+    renderTray(data);
+    updateFormState();
+    toast('Tray found: ' + data.trayName, 'success', 1800);
+    setTimeout(() => els.weightInput.focus(), 150);
+  } catch (err) {
+    if (seq !== state.lookupSeq) return;
+    els.trayBox.className = 'tray notfound';
+    els.trayBox.innerHTML =
+      '<div class="tray-name">Lookup failed</div>' +
+      '<div class="tray-meta"><span>Barcode</span><b>' + escapeHtml(barcode) + '</b></div>' +
+      '<div class="hint" style="color:var(--red)">' + escapeHtml(err.message) + '</div>';
+    toast(err.message, 'error', 4500);
+  }
+}
+
+function renderTray(t) {
+  els.trayBox.className = 'tray found';
+  let meta =
+    '<span>Barcode</span><b>' + escapeHtml(t.barcode) + '</b>' +
+    '<span>Initial</span><b>' + fmtG(t.initialWeight) + '</b>';
+  if (t.lastWeight !== null && t.lastWeight !== undefined) {
+    meta += '<span>Last</span><b>' + fmtG(t.lastWeight) + ' · ' + escapeHtml(fmtDate(t.lastTimestamp)) + '</b>';
+  }
+  els.trayBox.innerHTML =
+    '<div class="tray-name">✓ ' + escapeHtml(t.trayName) + '</div>' +
+    '<div class="tray-meta">' + meta + '</div>';
+}
+
+/* ---------------- Weight input ---------------- */
+function currentWeight() {
+  const v = parseFloat(String(els.weightInput.value).replace(',', '.'));
+  return isFinite(v) ? v : NaN;
+}
+
+function updateFormState() {
+  const hasTray = !!state.tray;
+  els.weightInput.disabled = !hasTray || state.submitting;
+  const w = currentWeight();
+  const valid = hasTray && w > 0 && w <= 100000;
+  els.submitBtn.disabled = !valid || state.submitting;
+  updateWeightHint(w);
+}
+
+function updateWeightHint(w) {
+  const t = state.tray;
+  els.weightHint.className = 'hint';
+  els.weightHint.textContent = '';
+  if (!t || !(w > 0)) return;
+  const parts = [];
+  if (t.initialWeight > 0) {
+    const d = w - t.initialWeight;
+    parts.push((d >= 0 ? '+' : '') + d.toFixed(1) + ' g vs initial');
+  }
+  const ref = (t.lastWeight > 0) ? t.lastWeight : (t.initialWeight > 0 ? t.initialWeight : null);
+  if (ref) {
+    const pct = Math.abs(w - ref) / ref * 100;
+    if (pct > BIG_CHANGE_WARN_PCT) {
+      els.weightHint.className = 'hint warn';
+      els.weightHint.textContent = '⚠ ' + pct.toFixed(0) + '% different from ' + (t.lastWeight > 0 ? 'last' : 'initial') + ' weight — double-check.';
+      return;
+    }
+  }
+  els.weightHint.className = 'hint ok';
+  els.weightHint.textContent = parts.join(' · ');
+}
+
+/* ---------------- Submit ---------------- */
+function newId() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+
+async function submitWeight(e) {
+  e.preventDefault();
+  if (state.submitting || !state.tray) return;
+  const w = currentWeight();
+  if (!(w > 0)) { toast('Enter a valid weight.', 'error'); return; }
+
+  const entry = {
+    barcode: state.tray.barcode,
+    weight: Math.round(w * 10) / 10,
+    clientTimestamp: new Date().toISOString(),
+    submissionId: newId()
+  };
+  const trayName = state.tray.trayName;
+
+  state.submitting = true;
+  els.submitBtn.innerHTML = '<span class="spinner"></span> Saving…';
+  updateFormState();
+
+  try {
+    const res = await apiSave(entry);
+    if (!res.ok) throw new Error(res.error || 'Save failed.');
+    buzz(150);
+    toast('✓ Saved ' + fmtG(entry.weight) + ' — ' + trayName, 'success', 2500);
+    els.lastSaved.textContent = 'Last saved: ' + trayName + ' · ' + fmtG(entry.weight) + ' · ' + fmtDate(entry.clientTimestamp);
+    finishEntry();
+  } catch (err) {
+    if (err.network) {
+      addPending({ ...entry, trayName });
+      buzz([60, 60, 60]);
+      toast('No connection — saved on phone, will send later.', 'warn', 4000);
+      els.lastSaved.textContent = 'Queued offline: ' + trayName + ' · ' + fmtG(entry.weight);
+      finishEntry();
+    } else {
+      buzz([200, 100, 200]);
+      toast('Error: ' + err.message, 'error', 5000);
+    }
+  } finally {
+    state.submitting = false;
+    els.submitBtn.textContent = 'Save Weight';
+    updateFormState();
+  }
+}
+
+function finishEntry() {
+  state.tray = null;
+  els.weightInput.value = '';
+  els.weightInput.blur();
+  els.trayBox.className = 'tray';
+  els.trayBox.innerHTML = '<div class="placeholder">Ready for the next tray.</div>';
+  updateFormState();
+  if (AUTO_RESTART_SCANNER) setTimeout(startScanner, 600);
+}
+
+/* ---------------- Offline queue ---------------- */
+function readPending() {
+  try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch (e) { return []; }
+}
+function writePending(list) {
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(list)); } catch (e) {}
+  renderPending();
+}
+function addPending(entry) { const l = readPending(); l.push(entry); writePending(l); }
+
+function renderPending() {
+  const n = readPending().length;
+  els.pendingCount.textContent = n;
+  els.pendingBar.style.display = n ? 'block' : 'none';
+  updateNetBadge();
+}
+
+let flushing = false;
+async function flushPending(showToast) {
+  if (flushing || !isConfigured()) return;
+  let list = readPending();
+  if (!list.length) return;
+  flushing = true;
+  let sent = 0, failed = 0;
+  try {
+    for (const entry of [...list]) {
+      try {
+        const res = await apiSave(entry);
+        if (res.ok) {
+          sent++;
+          list = list.filter((x) => x.submissionId !== entry.submissionId);
+          writePending(list);
+        } else {
+          // server rejected it (e.g. barcode deleted) — drop it but tell the user
+          failed++;
+          list = list.filter((x) => x.submissionId !== entry.submissionId);
+          writePending(list);
+          toast('Dropped queued entry for ' + entry.barcode + ': ' + res.error, 'error', 5000);
+        }
+      } catch (err) {
+        break; // still offline — stop and try later
+      }
+    }
+  } finally {
+    flushing = false;
+  }
+  if (sent && showToast !== false) toast('✓ Sent ' + sent + ' queued entr' + (sent === 1 ? 'y' : 'ies') + '.', 'success', 3000);
+  else if (showToast && !sent && !failed) toast('Still offline. Will retry automatically.', 'warn', 3000);
+}
+
+function updateNetBadge() {
+  const n = readPending().length;
+  if (!navigator.onLine) { els.netBadge.textContent = 'Offline' + (n ? ' · ' + n + ' queued' : ''); els.netBadge.className = 'badge offline'; }
+  else if (n) { els.netBadge.textContent = n + ' queued'; els.netBadge.className = 'badge pending'; }
+  else { els.netBadge.textContent = 'Online'; els.netBadge.className = 'badge'; }
+}
+
+/* ---------------- Wire up ---------------- */
+els.scanBtn.addEventListener('click', startScanner);
+els.stopBtn.addEventListener('click', stopScanner);
+els.manualForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const v = els.manualInput.value.trim();
+  if (!v) { els.manualInput.focus(); return; }
+  stopScanner();
+  els.manualInput.blur();
+  lookupBarcode(v);
+});
+els.weightInput.addEventListener('input', updateFormState);
+els.weightForm.addEventListener('submit', submitWeight);
+els.retryBtn.addEventListener('click', () => flushPending(true));
+window.addEventListener('online', () => { updateNetBadge(); flushPending(); });
+window.addEventListener('offline', updateNetBadge);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && state.scanning) stopScanner(); // release camera when app is backgrounded
+});
+
+if (!isConfigured()) els.configWarning.style.display = 'block';
+renderPending();
+updateFormState();
+if (navigator.onLine) flushPending();
+setInterval(() => { if (navigator.onLine) flushPending(false); }, 60000);
+</script>
+</body>
+</html>
