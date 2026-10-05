@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#1b5e20">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
 <title>Tray Weights</title>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
@@ -26,6 +27,7 @@
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     background: var(--bg);
@@ -83,6 +85,7 @@
   }
   input[type=number]::-webkit-outer-spin-button,
   input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input { -webkit-appearance: none; appearance: none; }
   input[type=number] { -moz-appearance: textfield; appearance: textfield; }
   input:focus { outline: none; border-color: var(--green-2); box-shadow: 0 0 0 3px rgba(46,125,50,.2); }
   .weight-wrap { position: relative; }
@@ -248,7 +251,7 @@
    CONFIGURATION — paste your deployed Apps Script Web App URL here.
    It looks like: https://script.google.com/macros/s/AKfy..../exec
    ===================================================================== */
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyOsuvirg1KZs6F2uKJ0KAy2tVHMiu-_iAiulwBLsbynybTMmjjiyhK_IptGJjPOESR/exec';
+const WEB_APP_URL = 'PASTE_YOUR_WEB_APP_URL_HERE';
 
 /* Options */
 const AUTO_RESTART_SCANNER = true;   // reopen camera after each successful save
@@ -391,7 +394,6 @@ async function startScanner() {
           const height = Math.max(80, Math.floor(Math.min(h, w) * 0.5));
           return { width, height };
         },
-        aspectRatio: 1.333,
         disableFlip: false
       },
       onScanSuccess,
@@ -601,8 +603,8 @@ function openCutForm(batch) {
     els.cutFormTitle.textContent = 'Update: ' + (batch.mother || 'No mother');
     els.cutMother.value = batch.mother || '';
     els.cutMother.disabled = true;
-    els.cutInitial.value = batch.initial ?? '';
-    els.cutRooted.value = batch.rooted ?? '';
+    els.cutInitial.value = batch.initial != null ? batch.initial : '';
+    els.cutRooted.value = batch.rooted != null ? batch.rooted : '';
     setTimeout(() => els.cutRooted.focus(), 100);
   } else {
     els.cutFormTitle.textContent = 'Add cuttings';
