@@ -407,7 +407,7 @@ function rootProblem() {
 }
 
 /* ---------------- save ---------------- */
-async function save() {
+function save() {
   if (state.saving) return;
   if (state.bigChange && !state.bigOk) { state.bigOk = true; buzz([60, 60, 60]); update(); return; }
   const t = state.data.trays[state.idx];
@@ -418,32 +418,14 @@ async function save() {
     rooted: rootValues().map((r) => ({ mother: r.mother, rooted: r.rooted })),
     clientTimestamp: new Date().toISOString(), submissionId: newId()
   };
-  state.saving = true;
-  $('saveBtn').innerHTML = '<span class="spinner"></span> Saving…';
-  update();
-  try {
-    const res = await apiPost(entry);
-    if (!res.ok) throw new Error(res.error || 'Save failed');
-    markSaved(t, entry, false, res);
-    buzz(120);
-    toast('✓ Tray ' + t.tray + ' saved' + (entry.irrigated ? ' · 💧' : ''), 'success', 1600);
-    next();
-  } catch (err) {
-    if (err.network) {
-      const q = load(PENDING_KEY, []); q.push(entry); store(PENDING_KEY, q);
-      markSaved(t, entry, true, null);
-      toast('No signal – saved on phone, will send later', 'warn', 3000);
-      updateBadge();
-      next();
-    } else {
-      buzz([200, 100, 200]);
-      toast('Error: ' + err.message, 'error', 5000);
-    }
-  } finally {
-    state.saving = false;
-    $('saveBtn').innerHTML = 'Save &amp; next ›';
-    if (state.data.trays[state.idx]) update();
-  }
+  // Save on the phone first and move on at once; the sheet is updated in the background.
+  const q = load(PENDING_KEY, []); q.push(entry); store(PENDING_KEY, q);
+  markSaved(t, entry, true, null);
+  buzz(80);
+  toast('✓ Tray ' + t.tray + (entry.irrigated ? ' · 💧' : ''), 'success', 1100);
+  next();
+  updateBadge();
+  flush();
 }
 
 function markSaved(t, entry, queued, res) {
@@ -485,28 +467,35 @@ function showMsg(html) { const m = $('msgCard'); m.innerHTML = html; m.style.dis
 let flushing = false;
 async function flush() {
   if (flushing) return;
-  let q = load(PENDING_KEY, []);
-  if (!q.length) { updateBadge(); return; }
   flushing = true;
-  let sent = 0;
-  try {
-    for (const e of [...q]) {
-      try {
-        const res = await apiPost(e);
-        q = q.filter((x) => x.submissionId !== e.submissionId); store(PENDING_KEY, q);
-        if (res.ok) sent++; else toast('Tray ' + e.tray + ': ' + res.error, 'error', 5000);
-        const t = state.data && state.data.trays.find((x) => x.tray === e.tray);
-        if (t) t._queued = false;
-      } catch (err) { break; }
-    }
-  } finally { flushing = false; }
-  if (sent) { toast('✓ Sent ' + sent + ' saved-offline weighing' + (sent > 1 ? 's' : ''), 'success'); if (state.data) renderChips(); }
   updateBadge();
+  try {
+    while (true) {
+      const q = load(PENDING_KEY, []);
+      if (!q.length) break;
+      const e = q[0];
+      let res;
+      try { res = await apiPost(e); }
+      catch (err) { break; } // no connection – keep everything, try again later
+      store(PENDING_KEY, load(PENDING_KEY, []).filter((x) => x.submissionId !== e.submissionId));
+      const t = state.data && state.data.trays.find((x) => x.tray === e.tray);
+      if (res.ok) {
+        if (t && !load(PENDING_KEY, []).some((x) => x.tray === e.tray)) t._queued = false;
+      } else {
+        // the server refused it (e.g. tray closed) – undo the local mark so it is visible
+        toast('Tray ' + e.tray + ' NOT saved: ' + res.error, 'error', 6000);
+        buzz([200, 100, 200]);
+        if (t) { t.todayWeight = null; t.todayIrrigated = null; t._queued = false; }
+      }
+      if (state.data) { renderChips(); updateProgress(); store(CACHE_KEY, { at: Date.now(), data: state.data }); }
+      updateBadge();
+    }
+  } finally { flushing = false; updateBadge(); }
 }
 function updateBadge() {
   const n = load(PENDING_KEY, []).length, b = $('netBadge');
   if (!navigator.onLine) { b.textContent = 'Offline' + (n ? ' · ' + n : ''); b.className = 'badge offline'; }
-  else if (n) { b.textContent = n + ' to send'; b.className = 'badge pending'; }
+  else if (n) { b.textContent = (flushing ? 'Sending ' : '') + n + (flushing ? '…' : ' to send'); b.className = 'badge pending'; }
   else { b.textContent = 'Online'; b.className = 'badge'; }
 }
 
