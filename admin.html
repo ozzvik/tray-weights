@@ -2,520 +2,554 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1b5e20">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="format-detection" content="telephone=no">
-<title>Morning Round</title>
+<title>Tray Admin</title>
 <style>
-  :root {
-    --green: #1b5e20; --green-2: #2e7d32; --green-light: #e8f5e9;
-    --blue: #1565c0; --blue-light: #e3f2fd;
-    --red: #c62828; --red-light: #ffebee;
-    --amber: #ef6c00; --amber-light: #fff3e0;
-    --ink: #1a1a1a; --muted: #5f6b5f; --line: #d5dcd5; --bg: #f3f6f3; --card: #fff;
-  }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-  html, body { margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: var(--bg); color: var(--ink); font-size: 18px; line-height: 1.3; padding-bottom: env(safe-area-inset-bottom); }
-  header { background: var(--green); color: #fff; padding: calc(10px + env(safe-area-inset-top)) 16px 10px; position: sticky; top: 0; z-index: 10; }
-  .hrow { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  header h1 { font-size: 19px; margin: 0; }
-  .badge { font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.18); white-space: nowrap; }
-  .badge.offline { background: var(--red); } .badge.pending { background: var(--amber); }
-  .progress { margin-top: 8px; height: 8px; border-radius: 99px; background: rgba(255,255,255,.25); overflow: hidden; }
-  .progress > div { height: 100%; background: #a5d6a7; width: 0; transition: width .3s; }
-  .ptext { font-size: 14px; margin-top: 4px; opacity: .95; }
-  main { max-width: 560px; margin: 0 auto; padding: 12px 12px 40px; }
-  .card { background: var(--card); border-radius: 14px; padding: 14px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip { min-width: 44px; height: 40px; padding: 0 8px; border-radius: 10px; border: 2px solid var(--line); background: #fff; font: inherit; font-weight: 800; font-size: 16px; color: var(--ink); position: relative; cursor: pointer; }
-  .chip.done { background: var(--green-light); border-color: #a5d6a7; color: var(--green); }
-  .chip.queued { background: var(--amber-light); border-color: #ffcc80; color: var(--amber); }
-  .chip.current { border-color: var(--green-2); box-shadow: 0 0 0 2px var(--green-2); }
-  .chip.root::after { content: ""; position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: var(--amber); }
-
-  .tray-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-  .tray-no { font-size: 46px; font-weight: 900; line-height: 1; }
-  .tray-no small { font-size: 18px; font-weight: 700; color: var(--muted); display: block; margin-bottom: 2px; }
-  .day { text-align: right; font-size: 15px; color: var(--muted); font-weight: 700; }
-  .day b { display: block; font-size: 26px; color: var(--ink); }
-  .tag { display: inline-block; margin-top: 4px; font-size: 12px; font-weight: 800; padding: 3px 8px; border-radius: 6px; background: var(--amber-light); color: var(--amber); }
-  .mothers { font-size: 14px; color: var(--muted); margin: 8px 0 0; }
-  .last { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: #f6f8f6; font-size: 15px; display: flex; justify-content: space-between; gap: 8px; }
-  .last b { font-size: 18px; }
-  .today-note { margin-top: 8px; font-size: 14px; font-weight: 700; color: var(--green-2); }
-
-  .weight-wrap { position: relative; margin-top: 12px; }
-  input { font: inherit; -webkit-appearance: none; appearance: none; }
-  input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  input[type=number] { -moz-appearance: textfield; appearance: textfield; }
-  #weightInput { width: 100%; border: 3px solid var(--line); border-radius: 14px; font-size: 44px; font-weight: 800; text-align: center; padding: 10px 56px 10px 14px; min-height: 86px; background: #fff; color: var(--ink); }
-  #weightInput:focus { outline: none; border-color: var(--green-2); }
-  .unit { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); font-size: 24px; font-weight: 800; color: var(--muted); pointer-events: none; }
-
-  .db { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-  .db .cell { border: 2px solid var(--line); border-radius: 12px; padding: 8px; text-align: center; }
-  .db .lbl { font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
-  .db .num { font-size: 30px; font-weight: 900; line-height: 1.15; }
-  .db .cell.main .num { color: var(--amber); }
-  .db .cell.none .num { color: #b8c0b8; }
-
-  .rec { margin-top: 10px; border-radius: 12px; padding: 12px 14px; font-size: 18px; font-weight: 800; display: none; }
-  .rec.irrigate { display: block; background: var(--blue-light); color: var(--blue); border: 2px solid #90caf9; }
-  .rec.ok { display: block; background: var(--green-light); color: var(--green); border: 2px solid #a5d6a7; }
-  .rec.info { display: block; background: #f6f8f6; color: var(--muted); border: 2px solid var(--line); font-size: 16px; }
-  .rec small { display: block; font-size: 13px; font-weight: 600; opacity: .85; margin-top: 2px; }
-
-  .irr { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-  button { font: inherit; border: 0; border-radius: 12px; cursor: pointer; font-weight: 800; }
-  .irr button { min-height: 60px; font-size: 19px; background: #fff; border: 2px solid var(--line); color: var(--ink); }
-  .irr button.on-yes { background: var(--blue); border-color: var(--blue); color: #fff; }
-  .irr button.on-no { background: #455a64; border-color: #455a64; color: #fff; }
-
-  .roots { margin-top: 12px; border: 2px dashed #ffcc80; background: #fffaf2; border-radius: 12px; padding: 10px 12px; }
-  .roots h3 { margin: 0 0 6px; font-size: 16px; color: var(--amber); }
-  .roots .r { display: grid; grid-template-columns: 1fr 110px auto; align-items: center; gap: 8px; margin-top: 6px; }
-  .roots .r span { font-weight: 700; word-break: break-word; }
-  .roots .r em { font-style: normal; color: var(--muted); font-size: 15px; white-space: nowrap; }
-  .roots input { width: 100%; border: 2px solid var(--line); border-radius: 10px; font-size: 22px; font-weight: 800; text-align: center; padding: 8px; background: #fff; }
-  .roots p { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
-
-  .save { width: 100%; min-height: 72px; margin-top: 14px; font-size: 24px; background: var(--green); color: #fff; display: flex; align-items: center; justify-content: center; gap: 10px; }
-  .save:disabled { opacity: .4; }
-  .hint { font-size: 14px; font-weight: 700; color: var(--amber); margin-top: 8px; min-height: 18px; text-align: center; }
-
-  .center { text-align: center; padding: 26px 10px; }
-  .center .big { font-size: 26px; font-weight: 900; margin: 6px 0; }
-  .center button { margin-top: 14px; min-height: 52px; padding: 0 22px; background: #eef2ee; border: 2px solid var(--line); color: var(--ink); font-size: 17px; }
-  .sum { text-align: left; margin-top: 14px; font-size: 15px; }
-  .sum div { display: flex; justify-content: space-between; padding: 6px 2px; border-bottom: 1px solid #eef0ee; }
-
-  .spinner { width: 22px; height: 22px; border: 3px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; }
-  .spinner.dark { border-color: rgba(0,0,0,.12); border-top-color: var(--green-2); display: inline-block; }
+  :root { --green: #1b5e20; --green-2: #2e7d32; --green-light: #e8f5e9; --blue: #1565c0; --red: #c62828; --amber: #ef6c00; --ink: #1a1a1a; --muted: #5f6b5f; --line: #d5dcd5; --bg: #f3f6f3; }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: var(--bg); color: var(--ink); font-size: 16px; }
+  header { background: var(--green); color: #fff; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 5; }
+  header h1 { margin: 0; font-size: 19px; }
+  header a { color: #fff; font-size: 14px; }
+  main { max-width: 900px; margin: 0 auto; padding: 14px; }
+  .card { background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
+  input, select { font: inherit; border: 2px solid var(--line); border-radius: 8px; padding: 8px 10px; background: #fff; min-height: 42px; -webkit-appearance: none; appearance: none; }
+  input[type=checkbox] { -webkit-appearance: checkbox; appearance: auto; padding: 0; min-height: auto; width: 22px; height: 22px; accent-color: var(--green-2); }
+  input:focus { outline: none; border-color: var(--green-2); }
+  button { font: inherit; font-weight: 700; border: 0; border-radius: 10px; padding: 10px 16px; cursor: pointer; min-height: 44px; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .primary { background: var(--green-2); color: #fff; }
+  .secondary { background: #eef2ee; border: 2px solid var(--line); color: var(--ink); }
+  .danger { background: #ffebee; border: 2px solid #f3c1c1; color: var(--red); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .msg { font-weight: 700; margin-top: 8px; min-height: 20px; }
+  .msg.ok { color: var(--green-2); } .msg.err { color: var(--red); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { padding: 8px 6px; border-bottom: 1px solid #eef0ee; text-align: left; vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  td.n { font-weight: 800; font-size: 16px; }
+  .pill { display: inline-block; padding: 2px 7px; border-radius: 6px; font-size: 12px; font-weight: 800; }
+  .pill.todo { background: #fff3e0; color: var(--amber); } .pill.ok { background: var(--green-light); color: var(--green); } .pill.irr { background: #e3f2fd; color: var(--blue); }
+  .settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+  label { display: block; font-size: 13px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+  .settings input { width: 100%; }
+  .tray-ed { border: 2px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 10px; }
+  .tray-ed .top { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+  .tray-ed .top .no input { width: 90px; font-weight: 800; font-size: 18px; text-align: center; }
+  .tray-ed .top .iw input { width: 130px; }
+  .mrow { display: grid; grid-template-columns: 1fr 110px 44px; gap: 8px; margin-top: 8px; }
+  .mrow input { width: 100%; min-width: 0; }
+  .x { background: none; color: var(--muted); font-size: 20px; padding: 0; min-height: 42px; }
+  .viz { --c-fast: #eb6834; --c-slow: #2a78d6; --c-ctx: #c9cdc9; --c-grid: #e6e9e6; --c-ref: #8a8f8a; }
+  .cohort { margin: 6px 0 18px; }
+  .cohort h3 { font-size: 15px; margin: 0 0 2px; }
+  .cohort .sub { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .chartbox { position: relative; }
+  .chartbox svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); margin: 4px 0 10px; }
+  .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .tip { position: absolute; pointer-events: none; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.12); white-space: nowrap; display: none; z-index: 3; }
+  .tip b { font-size: 14px; }
+  .flag { font-weight: 800; font-size: 12px; padding: 2px 7px; border-radius: 6px; white-space: nowrap; }
+  .flag.fast { background: #fde7dd; color: #b8461b; } .flag.slow { background: #e1edfb; color: #1d5ea8; }
+  .spinner { width: 18px; height: 18px; border: 3px solid rgba(0,0,0,.12); border-top-color: var(--green-2); border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; vertical-align: middle; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  #toast { position: fixed; left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom)); max-width: 536px; margin: 0 auto; padding: 16px 18px; border-radius: 14px; color: #fff; font-size: 18px; font-weight: 800; box-shadow: 0 6px 24px rgba(0,0,0,.25); transform: translateY(160%); transition: transform .25s; z-index: 50; }
-  #toast.show { transform: translateY(0); }
-  #toast.success { background: var(--green); } #toast.error { background: var(--red); } #toast.warn { background: var(--amber); } #toast.info { background: #37474f; }
-  .foot { text-align: center; font-size: 13px; color: var(--muted); margin-top: 6px; }
-  .foot button { background: none; color: var(--muted); text-decoration: underline; font-weight: 600; font-size: 14px; padding: 8px; }
 </style>
 </head>
 <body>
-<header>
-  <div class="hrow">
-    <h1>🌱 Morning Round <span id="dateLbl" style="font-weight:600;opacity:.85"></span></h1>
-    <span id="netBadge" class="badge">Online</span>
-  </div>
-  <div class="progress"><div id="progBar"></div></div>
-  <div class="ptext" id="progText">Loading…</div>
-</header>
-
+<header><h1>🛠️ Tray Admin</h1><a href="./">Morning round →</a></header>
 <main>
-  <section class="card" id="chipsCard" style="display:none">
-    <div class="chips" id="chips"></div>
+  <div id="loading" class="card"><span class="spinner"></span> Loading…</div>
+
+  <!-- ADD TRAYS -->
+  <section class="card" id="addCard" style="display:none">
+    <h2>Add trays</h2>
+    <div class="row" style="margin-bottom:10px">
+      <div><label for="startDate">Cutting date (day 0)</label><input type="date" id="startDate"></div>
+    </div>
+    <div id="trayEds"></div>
+    <div class="row">
+      <button class="secondary" id="addTrayBtn" type="button">➕ Tray</button>
+      <button class="secondary" id="dupTrayBtn" type="button">⧉ Copy last tray</button>
+      <span style="flex:1"></span>
+      <button class="primary" id="saveTraysBtn" type="button">Save trays</button>
+    </div>
+    <p class="muted">Write the tray number on the tray with a marker. Initial weight is optional – if empty, the worker's first weighing becomes the full weight (weigh right after watering).</p>
+    <div class="msg" id="addMsg"></div>
+    <datalist id="motherList"></datalist>
   </section>
 
-  <section class="card" id="trayCard" style="display:none">
-    <div class="tray-head">
-      <div class="tray-no"><small>Tray</small><span id="tNo"></span></div>
-      <div class="day" id="tDay"></div>
+  <!-- BULK IMPORT -->
+  <section class="card" id="bulkCard" style="display:none">
+    <h2>Bulk import (paste list)</h2>
+    <p class="muted" style="margin-top:0">One tray per line: <code>tray | cutting date | mother=cuttings, mother=cuttings | weighing date=grams</code><br>
+      Example: <code>1001 | 30.9 | D2#7=7, D2#8=26 | 5.10=3360</code> — the weighing part is optional (max 7 days back).</p>
+    <textarea id="bulkText" style="width:100%;min-height:140px;font:13px/1.35 ui-monospace,Consolas,monospace;border:2px solid var(--line);border-radius:10px;padding:10px"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button class="secondary" id="bulkCheck" type="button">Check</button>
+      <button class="primary" id="bulkRun" type="button" disabled>Import</button>
     </div>
-    <div class="mothers" id="tMothers"></div>
-    <div class="last" id="tLast"></div>
-    <div class="today-note" id="tToday"></div>
-
-    <div class="weight-wrap">
-      <input id="weightInput" type="number" inputmode="decimal" step="0.1" min="0" placeholder="Weight" aria-label="Weight in grams" autocomplete="off">
-      <span class="unit">g</span>
-    </div>
-
-    <div class="db">
-      <div class="cell main none" id="dbFull"><div class="lbl">Dryback (from full)</div><div class="num">—</div></div>
-      <div class="cell none" id="dbPrev"><div class="lbl">Since last</div><div class="num">—</div></div>
-    </div>
-
-    <div class="rec" id="rec"></div>
-
-    <div class="irr">
-      <button id="irrYes" type="button">💧 Irrigated</button>
-      <button id="irrNo" type="button">Not irrigated</button>
-    </div>
-
-    <div class="roots" id="roots" style="display:none"></div>
-
-    <button class="save" id="saveBtn" type="button" disabled>Save &amp; next ›</button>
-    <div class="hint" id="hint"></div>
+    <div class="msg" id="bulkMsg"></div>
+    <div class="table-wrap" id="bulkPrev"></div>
   </section>
 
-  <section class="card" id="msgCard" style="display:none"></section>
+  <!-- ACTIVE -->
+  <section class="card" id="activeCard" style="display:none">
+    <h2>Active trays <span id="activeCount"></span></h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th></th><th>Tray</th><th>Day</th><th>Mothers (rooted / cut)</th><th>Full</th><th>Today</th><th>Dryback</th></tr></thead>
+        <tbody id="activeBody"></tbody>
+      </table>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="danger" id="closeBtn" type="button" disabled>Close selected (transplanted)</button>
+      <span class="muted" id="selInfo"></span>
+    </div>
+    <div class="msg" id="closeMsg"></div>
+  </section>
 
-  <div class="foot"><button id="reloadBtn" type="button">↻ Reload trays</button></div>
+  <!-- TRENDS -->
+  <section class="card viz" id="trendCard" style="display:none">
+    <h2>Trends – weight loss per tray</h2>
+    <p class="muted" style="margin-top:0">Each line is a tray: weight as % of its full weight, by day. Trays that lose weight
+      clearly <b>faster</b> or <b>slower</b> than the others in the same cycle are highlighted.
+      Days right after an irrigation are left out of the loss rate.</p>
+    <div class="legend">
+      <span><i style="background:var(--c-fast)"></i>Drying faster</span>
+      <span><i style="background:var(--c-slow)"></i>Drying slower</span>
+      <span><i style="background:var(--c-ctx)"></i>Other trays</span>
+      <span><i style="background:none;border-top:2px dashed var(--c-ref);height:0"></i>Irrigation limit</span>
+    </div>
+    <div id="trendCharts"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Tray</th><th>Cycle</th><th>Day</th><th>Loss / day</th><th>Cycle median</th><th>From full now</th><th></th></tr></thead>
+        <tbody id="trendBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- RANKING -->
+  <section class="card" id="rankCard" style="display:none">
+    <h2>Mother ranking (rooting %)</h2>
+    <div class="table-wrap"><table><thead><tr><th>#</th><th>Mother</th><th>Rooting</th><th>Rooted / counted</th><th>Not counted yet</th></tr></thead><tbody id="rankBody"></tbody></table></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="card" id="setCard" style="display:none">
+    <h2>Settings</h2>
+    <div class="settings">
+      <div><label for="sDb">Irrigate when dryback ≥ (%)</label><input id="sDb" type="number" min="1" max="90" step="0.5"></div>
+      <div><label for="sRoot">Rooting check from day</label><input id="sRoot" type="number" min="1" max="60" step="1"></div>
+      <div><label for="sCycle">Transplant on day</label><input id="sCycle" type="number" min="1" max="90" step="1"></div>
+    </div>
+    <div class="row" style="margin-top:10px"><button class="primary" id="saveSetBtn" type="button">Save settings</button></div>
+    <div class="msg" id="setMsg"></div>
+  </section>
 </main>
-
-<div id="toast" role="status" aria-live="polite"></div>
 
 <script>
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyOsuvirg1KZs6F2uKJ0KAy2tVHMiu-_iAiulwBLsbynybTMmjjiyhK_IptGJjPOESR/exec';
 const API_URL = WEB_APP_URL.trim().replace(/[?#].*$/, '');
-const REQUEST_TIMEOUT_MS = 20000;
-const PENDING_KEY = 'round.pending.v2';
-const CACHE_KEY = 'round.cache.v2';
-
 const $ = (id) => document.getElementById(id);
-const state = {
-  data: null,          // round data from server
-  idx: -1,             // current tray index
-  irrigated: null,     // true/false/null
-  irrTouched: false,   // worker changed irrigation by hand
-  saving: false
-};
+let data = null;
+let selected = new Set();
 
-/* ---------------- helpers ---------------- */
-let toastTimer;
-function toast(msg, type = 'info', ms = 2600) {
-  const t = $('toast'); t.textContent = msg; t.className = 'show ' + type;
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.className = type; }, ms);
-}
-function buzz(p) { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function g(n) { return (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString(undefined, { maximumFractionDigits: 1 }) + ' g'; }
-function ddmm(day) { const m = String(day || '').match(/^\d{4}-(\d{2})-(\d{2})/); return m ? m[2] + '/' + m[1] : ''; }
-function pct(ref, w) { return (ref > 0 && w > 0) ? (ref - w) / ref * 100 : null; }
-function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
-function load(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
-function newId() { return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2); }
-
-async function fetchJson(url, options = {}) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
-  try {
-    const res = await fetch(url, { ...options, signal: ctrl.signal, redirect: 'follow' });
-    const text = await res.text();
-    try { return JSON.parse(text); }
-    catch (e) { throw new Error('The server returned an error page – check that the newest Code.gs is deployed.'); }
-  } catch (err) {
-    if (err.name === 'AbortError' || err instanceof TypeError) { const e = new Error('No connection'); e.network = true; throw e; }
-    throw err;
-  } finally { clearTimeout(timer); }
+function msg(id, text, cls) { $(id).textContent = text; $(id).className = 'msg ' + (cls || ''); }
+async function api(method, body) {
+  const url = method === 'GET' ? API_URL + '?action=round&t=' + Date.now() : API_URL;
+  const opt = method === 'GET' ? {} : { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) };
+  let res;
+  try { res = await fetch(url, { ...opt, redirect: 'follow' }); } catch (e) { throw new Error('No connection to the server.'); }
+  const text = await res.text();
+  let j; try { j = JSON.parse(text); } catch (e) { throw new Error('Server returned an error page – check that the newest Code.gs is deployed (New version).'); }
+  if (!j.ok) throw new Error(j.error || 'Request failed');
+  return j;
 }
-const apiRound = () => fetchJson(API_URL + '?action=round&t=' + Date.now());
-const apiPost = (body) => fetchJson(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
+function localToday() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 
-/* ---------------- loading ---------------- */
-async function loadRound() {
-  $('progText').textContent = 'Loading trays…';
+async function reload() {
   try {
-    const data = await apiRound();
-    if (!data.ok) throw new Error(data.error || 'Could not load trays.');
-    store(CACHE_KEY, { at: Date.now(), data });
-    applyPendingToData(data);
-    start(data);
+    data = await api('GET');
+    $('loading').style.display = 'none';
+    ['addCard', 'bulkCard', 'activeCard', 'rankCard', 'setCard'].forEach((id) => { $(id).style.display = 'block'; });
+    render();
+    loadTrends();
   } catch (err) {
-    const cached = load(CACHE_KEY, null);
-    if (err.network && cached && cached.data) {
-      const d = cached.data;
-      const now = todayLocal();
-      if (d.today !== now) {
-        // cached list is from an earlier day: yesterday's weights become "last", day numbers move on
-        const diff = Math.round((Date.parse(now) - Date.parse(d.today)) / 86400000);
-        d.trays.forEach((t) => {
-          if (t.todayWeight != null) { t.lastWeight = t.todayWeight; t.lastIrrigated = t.todayIrrigated; t.lastDate = d.today; t.todayWeight = null; t.todayIrrigated = null; }
-          if (t.day != null) t.day += diff;
-          t._queued = false;
-        });
-        d.today = now;
-      }
-      applyPendingToData(d);
-      start(d);
-      toast('Offline – using saved tray list', 'warn', 3500);
-    } else {
-      showMsg('<div class="center"><div style="font-size:40px">⚠️</div><div class="big">Could not load trays</div><div>' + esc(err.message) + '</div><button type="button" onclick="loadRound()">Try again</button></div>');
-    }
+    $('loading').innerHTML = '⚠️ ' + esc(err.message) + ' <button class="secondary" onclick="reload()">Try again</button>';
   }
 }
 
-function todayLocal() { return localDay(new Date()); }
-function localDay(d) {
+function render() {
+  // mothers datalist
+  $('motherList').innerHTML = data.mothers.map((m) => '<option value="' + esc(m) + '">').join('');
+  // settings
+  $('sDb').value = data.settings.DrybackIrrigatePct; $('sRoot').value = data.settings.RootCheckDay; $('sCycle').value = data.settings.CycleDays;
+  // active
+  selected = new Set([...selected].filter((t) => data.trays.some((x) => x.tray === t)));
+  $('activeCount').textContent = '(' + data.trays.length + ')';
+  const tb = $('activeBody'); tb.innerHTML = '';
+  if (!data.trays.length) tb.innerHTML = '<tr><td colspan="7" class="muted">No active trays yet.</td></tr>';
+  data.trays.forEach((t) => {
+    const ready = t.day != null && t.day >= data.settings.CycleDays;
+    const mothers = (t.cuttings || []).map((c) => esc(c.mother || 'No mother') + ' ' +
+      (c.rooted != null ? '<b>' + c.rooted + '</b>/' + c.initial + ' (' + c.rootingPct + '%)' : '<span class="muted">–/' + c.initial + '</span>')).join('<br>') || '<span class="muted">—</span>';
+    const db = (t.initialWeight > 0 && t.todayWeight > 0) ? ((t.initialWeight - t.todayWeight) / t.initialWeight * 100).toFixed(1) + '%' : '—';
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td><input type="checkbox"' + (selected.has(t.tray) ? ' checked' : '') + ' style="min-height:auto;width:20px;height:20px"></td>' +
+      '<td class="n">' + esc(t.tray) + '</td>' +
+      '<td>' + (t.day != null ? t.day : '—') + (ready ? ' <span class="pill ok">transplant</span>' : t.needsRootCount ? ' <span class="pill todo">count roots</span>' : '') + '</td>' +
+      '<td>' + mothers + '</td><td>' + g(t.initialWeight) + '</td>' +
+      '<td>' + (t.todayWeight != null ? g(t.todayWeight) + (t.todayIrrigated === 'Yes' ? ' <span class="pill irr">💧</span>' : '') : '<span class="pill todo">not yet</span>') + '</td>' +
+      '<td>' + db + '</td>';
+    tr.querySelector('input').addEventListener('change', (e) => { e.target.checked ? selected.add(t.tray) : selected.delete(t.tray); updSel(); });
+    tb.appendChild(tr);
+  });
+  updSel();
+  // ranking
+  const rb = $('rankBody');
+  rb.innerHTML = data.ranking.length ? data.ranking.map((r) => '<tr><td>' + (r.rank || '') + '</td><td><b>' + esc(r.mother) + '</b></td><td>' +
+    (r.pct != null ? '<b>' + r.pct + '%</b>' : '—') + '</td><td>' + (r.counted ? r.rooted + ' / ' + r.counted : '—') + '</td><td>' + (r.pending || '') + '</td></tr>').join('')
+    : '<tr><td colspan="5" class="muted">No cuttings recorded yet.</td></tr>';
+  // tray editors
+  if (!$('trayEds').children.length) { $('startDate').value = localToday(); addTrayEd(); }
+  renumber();
+}
+
+function updSel() {
+  $('closeBtn').disabled = !selected.size;
+  $('selInfo').textContent = selected.size ? 'Trays ' + [...selected].join(', ') : '';
+}
+
+/* ---------- add-trays editor ---------- */
+function addTrayEd(copyFrom) {
+  const box = document.createElement('div');
+  box.className = 'tray-ed';
+  box.innerHTML = '<div class="top">' +
+    '<div class="no"><label>Tray #</label><input type="text" inputmode="numeric" class="tno"></div>' +
+    '<div class="iw"><label>Initial weight (g)</label><input type="number" inputmode="decimal" class="tiw" placeholder="optional"></div>' +
+    '<span style="flex:1"></span><button type="button" class="x rm" title="Remove tray">✕</button></div>' +
+    '<div class="ms"></div>' +
+    '<button type="button" class="secondary addm" style="margin-top:8px;min-height:38px;padding:6px 12px;font-size:14px">+ mother</button>';
+  const ms = box.querySelector('.ms');
+  const addM = (m, c) => {
+    const r = document.createElement('div');
+    r.className = 'mrow';
+    r.innerHTML = '<input type="text" list="motherList" placeholder="Mother" class="mm"><input type="number" inputmode="numeric" min="1" step="1" placeholder="Cuttings" class="mc"><button type="button" class="x">✕</button>';
+    r.querySelector('.mm').value = m || ''; r.querySelector('.mc').value = c || '';
+    r.querySelector('.x').addEventListener('click', () => r.remove());
+    ms.appendChild(r);
+  };
+  if (copyFrom) { copyFrom.querySelectorAll('.mrow').forEach((r) => addM(r.querySelector('.mm').value, r.querySelector('.mc').value)); }
+  if (!ms.children.length) addM();
+  box.querySelector('.addm').addEventListener('click', () => addM());
+  box.querySelector('.rm').addEventListener('click', () => { box.remove(); renumber(); });
+  box.querySelector('.tno').addEventListener('input', (e) => { e.target.dataset.manual = '1'; });
+  $('trayEds').appendChild(box);
+  renumber();
+}
+
+function renumber() {
+  // suggest numbers for editors the admin hasn't typed into
+  if (!data) return;
+  const used = new Set(data.trays.map((t) => t.tray));
+  let n = data.nextNumber;
+  $('trayEds').querySelectorAll('.tno').forEach((inp) => { if (inp.dataset.manual && inp.value.trim()) used.add(inp.value.trim()); });
+  $('trayEds').querySelectorAll('.tno').forEach((inp) => {
+    if (inp.dataset.manual && inp.value.trim()) return;
+    while (used.has(String(n))) n++;
+    inp.value = n; used.add(String(n)); n++;
+  });
+}
+
+$('addTrayBtn').addEventListener('click', () => addTrayEd());
+$('dupTrayBtn').addEventListener('click', () => { const eds = $('trayEds').children; addTrayEd(eds.length ? eds[eds.length - 1] : null); });
+
+$('saveTraysBtn').addEventListener('click', async () => {
+  const trays = [];
+  for (const ed of $('trayEds').children) {
+    const mothers = [];
+    for (const r of ed.querySelectorAll('.mrow')) {
+      const m = r.querySelector('.mm').value.trim(), c = r.querySelector('.mc').value.trim();
+      if (!m && !c) continue;
+      if (!/^\d+$/.test(c) || +c < 1) { msg('addMsg', 'Tray ' + ed.querySelector('.tno').value + ': enter the number of cuttings for ' + (m || 'each mother') + '.', 'err'); return; }
+      mothers.push({ mother: m, cuttings: +c });
+    }
+    trays.push({ tray: ed.querySelector('.tno').value.trim(), initialWeight: ed.querySelector('.tiw').value.trim(), mothers });
+  }
+  if (!trays.length) { msg('addMsg', 'Add at least one tray.', 'err'); return; }
+  const btn = $('saveTraysBtn'); btn.disabled = true; btn.textContent = 'Saving…'; msg('addMsg', '');
+  try {
+    const res = await api('POST', { action: 'addTrays', startDate: $('startDate').value, trays });
+    msg('addMsg', '✓ Added trays ' + res.added.join(', ') + ' (day 0 = ' + res.startDate + ')', 'ok');
+    $('trayEds').innerHTML = '';
+    await reload();
+  } catch (err) { msg('addMsg', err.message, 'err'); }
+  finally { btn.disabled = false; btn.textContent = 'Save trays'; }
+});
+
+/* ---------- bulk import ---------- */
+let bulkPlan = null;
+function parseDay(txt) {
+  const m = String(txt).trim().match(/^(\d{1,2})[.\/](\d{1,2})(?:[.\/](\d{2,4}))?$/);
+  if (!m) return null;
+  const now = new Date();
+  let y = m[3] ? (m[3].length === 2 ? 2000 + +m[3] : +m[3]) : now.getFullYear();
+  let d = new Date(y, +m[2] - 1, +m[1]);
+  if (!m[3] && d - now > 45 * 86400000) d = new Date(y - 1, +m[2] - 1, +m[1]); // e.g. 30.12 typed in January
+  if (d.getMonth() !== +m[2] - 1) return null;
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
-
-function applyPendingToData(data) {
-  // entries saved offline today still count as weighed
-  load(PENDING_KEY, []).forEach((p) => {
-    const t = data.trays.find((x) => x.tray === p.tray);
-    if (t && localDay(new Date(p.clientTimestamp)) === data.today) { t.todayWeight = p.weight; t.todayIrrigated = p.irrigated ? 'Yes' : 'No'; t._queued = true; }
-  });
-}
-
-function start(data) {
-  state.data = data;
-  $('dateLbl').textContent = ddmm(data.today);
-  if (!data.trays.length) {
-    $('chipsCard').style.display = 'none'; $('trayCard').style.display = 'none';
-    updateProgress();
-    showMsg('<div class="center"><div style="font-size:40px">🪴</div><div class="big">No active trays</div><div>Ask the manager to add trays.</div></div>');
-    return;
-  }
-  $('msgCard').style.display = 'none';
-  $('chipsCard').style.display = 'block';
-  const first = data.trays.findIndex((t) => t.todayWeight == null);
-  if (first < 0) { renderChips(); updateProgress(); showComplete(); return; }
-  select(first);
-}
-
-/* ---------------- render ---------------- */
-function updateProgress() {
-  const tr = state.data ? state.data.trays : [];
-  const done = tr.filter((t) => t.todayWeight != null).length;
-  $('progBar').style.width = tr.length ? (done / tr.length * 100) + '%' : '0';
-  $('progText').textContent = tr.length ? done + ' / ' + tr.length + ' trays weighed today' : '';
-}
-
-function renderChips() {
-  const box = $('chips'); box.innerHTML = '';
-  state.data.trays.forEach((t, i) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'chip' + (t._queued ? ' queued' : t.todayWeight != null ? ' done' : '') + (i === state.idx ? ' current' : '') + (t.needsRootCount ? ' root' : '');
-    b.textContent = t.tray;
-    b.addEventListener('click', () => select(i));
-    box.appendChild(b);
-  });
-}
-
-function select(i) {
-  state.idx = i;
-  const t = state.data.trays[i];
-  const s = state.data.settings;
-  $('msgCard').style.display = 'none';
-  $('trayCard').style.display = 'block';
-  renderChips(); updateProgress();
-
-  $('tNo').textContent = t.tray;
-  const dayTxt = t.day != null ? 'Day<b>' + t.day + '<span style="font-size:15px;color:var(--muted)"> / ' + s.CycleDays + '</span></b>' : '';
-  const tag = (t.day != null && t.day >= s.CycleDays) ? '<div class="tag">Ready to transplant</div>'
-    : (t.needsRootCount ? '<div class="tag">Rooting check</div>' : '');
-  $('tDay').innerHTML = dayTxt + tag;
-  $('tMothers').textContent = (t.cuttings || []).map((c) => (c.mother || 'No mother') + ' ×' + c.initial).join(' · ');
-  $('tLast').innerHTML = t.lastWeight != null
-    ? '<span>Last (' + ddmm(t.lastDate) + ')' + (t.lastIrrigated === 'Yes' ? ' 💧' : '') + '</span><b>' + g(t.lastWeight) + '</b>'
-    : '<span>' + (t.initialWeight ? 'Full weight' : 'First weighing') + '</span><b>' + (t.initialWeight ? g(t.initialWeight) : '—') + '</b>';
-  $('tToday').textContent = t.todayWeight != null ? '✓ Already weighed today: ' + g(t.todayWeight) + ' – saving again replaces it' : '';
-
-  $('weightInput').value = t.todayWeight != null ? t.todayWeight : '';
-  state.irrigated = t.todayWeight != null ? t.todayIrrigated === 'Yes' : null;
-  state.irrTouched = t.todayWeight != null;
-  state.bigOk = false;
-
-  renderRoots(t);
-  update();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  setTimeout(() => $('weightInput').focus(), 250);
-}
-
-function renderRoots(t) {
-  const box = $('roots');
-  const open = (t.cuttings || []).filter((c) => c.rooted == null);
-  if (!t.needsRootCount || !open.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
-  box.style.display = 'block';
-  box.innerHTML = '<h3>🌱 Rooting check – how many rooted?</h3>' +
-    open.map((c, k) => '<div class="r"><span>' + esc(c.mother || 'No mother') + '</span>' +
-      '<input type="number" inputmode="numeric" min="0" step="1" data-k="' + k + '" aria-label="Rooted">' +
-      '<em>/ ' + c.initial + '</em></div>').join('') +
-    '<p>Leave empty if not counted yet – the tray will ask again tomorrow.</p>';
-  box.querySelectorAll('input').forEach((inp) => inp.addEventListener('input', update));
-  box._batches = open;
-}
-
-const KG_LIMIT = 50;           // anything typed below 50 is read as kilograms (3.36 -> 3360 g)
-const BIG_CHANGE_PCT = 35;     // ask for a second tap when the weight is this far from the last/full weight
-function rawWeight() { const v = parseFloat(String($('weightInput').value).replace(',', '.')); return isFinite(v) ? v : NaN; }
-function currentWeight() { const v = rawWeight(); return v > 0 && v < KG_LIMIT ? Math.round(v * 1000) : v; }
-
-function update() {
-  const t = state.data.trays[state.idx];
-  const s = state.data.settings;
-  const w = currentWeight();
-  const full = t.initialWeight;
-  const dFull = pct(full, w), dPrev = pct(t.lastWeight, w);
-
-  setCell('dbFull', dFull); setCell('dbPrev', dPrev);
-
-  const rec = $('rec');
-  let recommend = null;
-  if (!(w > 0)) { rec.className = 'rec'; rec.innerHTML = ''; }
-  else if (!(full > 0)) {
-    rec.className = 'rec info'; rec.innerHTML = 'First weighing – this will be saved as the full weight.<small>Weigh right after watering.</small>';
-  } else if (dFull >= s.DrybackIrrigatePct) {
-    recommend = true;
-    rec.className = 'rec irrigate'; rec.innerHTML = '💧 Irrigate this tray<small>Dryback ' + dFull.toFixed(1) + '% – limit is ' + s.DrybackIrrigatePct + '%</small>';
-  } else {
-    recommend = false;
-    rec.className = 'rec ok'; rec.innerHTML = '✓ No irrigation needed<small>Dryback ' + (dFull > 0 ? dFull.toFixed(1) : '0') + '% – limit is ' + s.DrybackIrrigatePct + '%</small>';
-  }
-  if (!state.irrTouched && recommend !== null) state.irrigated = recommend;
-
-  $('irrYes').className = state.irrigated === true ? 'on-yes' : '';
-  $('irrNo').className = state.irrigated === false ? 'on-no' : '';
-
-  const rootErr = rootProblem();
-  const ref = t.lastWeight > 0 ? t.lastWeight : (full > 0 ? full : null);
-  const change = (ref && w > 0) ? Math.abs(w - ref) / ref * 100 : 0;
-  state.bigChange = change > BIG_CHANGE_PCT;
-  const ok = w > 0 && w <= 100000 && state.irrigated !== null && !rootErr && !state.saving;
-  $('saveBtn').innerHTML = state.saving ? $('saveBtn').innerHTML : (state.bigChange && !state.bigOk ? 'Check weight – tap to save anyway' : 'Save &amp; next ›');
-  $('saveBtn').style.background = state.bigChange && !state.bigOk ? 'var(--amber)' : '';
-  $('saveBtn').disabled = !ok;
-  const raw = rawWeight();
-  $('hint').textContent = rootErr
-    || (state.bigChange ? '⚠ ' + Math.round(change) + '% different from ' + (t.lastWeight > 0 ? 'last' : 'full') + ' weight (' + g(ref) + ') – check the number'
-    : (raw > 0 && raw < KG_LIMIT ? 'Read as ' + g(w) + ' (typed in kg)'
-    : (w > 0 && state.irrigated === null ? 'Choose: irrigated or not' : '')));
-}
-
-function setCell(id, p) {
-  const c = $(id), n = c.querySelector('.num');
-  n.style.color = '';
-  if (p === null) { c.classList.add('none'); n.textContent = '—'; return; }
-  c.classList.remove('none');
-  if (p >= 0) { n.textContent = p.toFixed(1) + '%'; }
-  else { n.innerHTML = '↑' + Math.abs(p).toFixed(1) + '%<span style="display:block;font-size:12px;font-weight:700">heavier</span>'; n.style.color = 'var(--blue)'; }
-}
-
-function rootValues() {
-  const box = $('roots');
-  if (box.style.display === 'none' || !box._batches) return [];
-  const out = [];
-  box.querySelectorAll('input').forEach((inp) => {
-    const v = inp.value.trim();
-    if (v === '') return;
-    const b = box._batches[+inp.dataset.k];
-    out.push({ mother: b.mother, rooted: Number(v), initial: b.initial });
-  });
-  return out;
-}
-function rootProblem() {
-  for (const r of rootValues()) {
-    if (!Number.isInteger(r.rooted) || r.rooted < 0) return 'Rooted must be a whole number';
-    if (r.initial != null && r.rooted > r.initial) return (r.mother || 'No mother') + ': rooted is more than ' + r.initial;
-  }
-  return '';
-}
-
-/* ---------------- save ---------------- */
-function save() {
-  if (state.saving) return;
-  if (state.bigChange && !state.bigOk) { state.bigOk = true; buzz([60, 60, 60]); update(); return; }
-  const t = state.data.trays[state.idx];
-  const w = Math.round(currentWeight() * 10) / 10;
-  if (!(w > 0) || state.irrigated === null) return;
-  const entry = {
-    action: 'log', tray: t.tray, weight: w, irrigated: state.irrigated,
-    rooted: rootValues().map((r) => ({ mother: r.mother, rooted: r.rooted })),
-    clientTimestamp: new Date().toISOString(), submissionId: newId()
-  };
-  // Save on the phone first and move on at once; the sheet is updated in the background.
-  const q = load(PENDING_KEY, []); q.push(entry); store(PENDING_KEY, q);
-  markSaved(t, entry, true, null);
-  buzz(80);
-  toast('✓ Tray ' + t.tray + (entry.irrigated ? ' · 💧' : ''), 'success', 1100);
-  next();
-  updateBadge();
-  flush();
-}
-
-function markSaved(t, entry, queued, res) {
-  t.todayWeight = entry.weight;
-  t.todayIrrigated = entry.irrigated ? 'Yes' : 'No';
-  t._queued = queued;
-  if (!(t.initialWeight > 0)) t.initialWeight = entry.weight;
-  entry.rooted.forEach((r) => {
-    const b = (t.cuttings || []).find((c) => (c.mother || '').toLowerCase() === (r.mother || '').toLowerCase());
-    if (b) b.rooted = r.rooted;
-  });
-  t.needsRootCount = t.needsRootCount && (t.cuttings || []).some((c) => c.rooted == null);
-  store(CACHE_KEY, { at: Date.now(), data: state.data });
-}
-
-function next() {
-  const tr = state.data.trays;
-  for (let k = 1; k <= tr.length; k++) {
-    const i = (state.idx + k) % tr.length;
-    if (tr[i].todayWeight == null) { select(i); return; }
-  }
-  renderChips(); updateProgress(); showComplete();
-}
-
-function showComplete() {
-  $('trayCard').style.display = 'none';
-  const tr = state.data.trays;
-  const irr = tr.filter((t) => t.todayIrrigated === 'Yes').map((t) => t.tray);
-  showMsg('<div class="center"><div style="font-size:44px">✅</div><div class="big">Round complete</div>' +
-    '<div>' + tr.length + ' / ' + tr.length + ' trays weighed</div>' +
-    '<div class="sum"><div><span>💧 Irrigated</span><b>' + (irr.length ? irr.join(', ') : 'none') + '</b></div>' +
-    '<div><span>Not irrigated</span><b>' + (tr.length - irr.length) + ' trays</b></div></div>' +
-    '<div style="margin-top:10px;font-size:14px;color:var(--muted)">Tap a tray number above to fix a weight.</div></div>');
-}
-
-function showMsg(html) { const m = $('msgCard'); m.innerHTML = html; m.style.display = 'block'; }
-
-/* ---------------- offline queue ---------------- */
-let flushing = false;
-async function flush() {
-  if (flushing) return;
-  flushing = true;
-  updateBadge();
-  try {
-    while (true) {
-      const q = load(PENDING_KEY, []);
-      if (!q.length) break;
-      const e = q[0];
-      let res;
-      try { res = await apiPost(e); }
-      catch (err) { break; } // no connection – keep everything, try again later
-      store(PENDING_KEY, load(PENDING_KEY, []).filter((x) => x.submissionId !== e.submissionId));
-      const t = state.data && state.data.trays.find((x) => x.tray === e.tray);
-      if (res.ok) {
-        if (t && !load(PENDING_KEY, []).some((x) => x.tray === e.tray)) t._queued = false;
-      } else {
-        // the server refused it (e.g. tray closed) – undo the local mark so it is visible
-        toast('Tray ' + e.tray + ' NOT saved: ' + res.error, 'error', 6000);
-        buzz([200, 100, 200]);
-        if (t) { t.todayWeight = null; t.todayIrrigated = null; t._queued = false; }
-      }
-      if (state.data) { renderChips(); updateProgress(); store(CACHE_KEY, { at: Date.now(), data: state.data }); }
-      updateBadge();
+function parseBulk(text) {
+  const plan = [], errors = [], seen = new Set();
+  text.split(/\r?\n/).forEach((line, i) => {
+    const raw = line.trim();
+    if (!raw || raw.startsWith('#')) return;
+    const parts = raw.split('|').map((x) => x.trim());
+    const ln = 'Line ' + (i + 1) + ': ';
+    const tray = (parts[0] || '').replace(/^0+(?=\d)/, '');
+    if (!tray) { errors.push(ln + 'missing tray number'); return; }
+    if (seen.has(tray)) { errors.push(ln + 'tray ' + tray + ' appears twice'); return; }
+    seen.add(tray);
+    const start = parseDay(parts[1] || '');
+    if (!start) { errors.push(ln + 'cutting date "' + (parts[1] || '') + '" not understood (use 30.9)'); return; }
+    const mothers = [];
+    for (const chunk of (parts[2] || '').split(',').map((x) => x.trim()).filter(Boolean)) {
+      const mm = chunk.match(/^(.*?)\s*[=:]\s*(\d+)$/) || chunk.match(/^(.*\S)\s+(\d+)$/);
+      if (!mm) { errors.push(ln + '"' + chunk + '" – write mother=count'); return; }
+      mothers.push({ mother: mm[1].trim(), cuttings: +mm[2] });
     }
-  } finally { flushing = false; updateBadge(); }
+    let weigh = null;
+    if (parts[3]) {
+      const wm = parts[3].match(/^([\d.\/]+)\s*=\s*([\d.]+)$/);
+      const wd = wm && parseDay(wm[1]);
+      if (!wm || !wd) { errors.push(ln + 'weighing "' + parts[3] + '" – write 5.10=3360'); return; }
+      let g = parseFloat(wm[2]); if (g < 50) g = Math.round(g * 1000); // 3.36 kg -> 3360 g
+      const ageDays = (Date.now() - new Date(wd + 'T09:00:00')) / 86400000;
+      if (ageDays > 6.9) { errors.push(ln + 'weighing date ' + wm[1] + ' is more than 7 days ago – the server will not accept it'); return; }
+      weigh = { day: wd, grams: g };
+    }
+    plan.push({ tray, start, mothers, weigh });
+  });
+  return { plan, errors };
 }
-function updateBadge() {
-  const n = load(PENDING_KEY, []).length, b = $('netBadge');
-  if (!navigator.onLine) { b.textContent = 'Offline' + (n ? ' · ' + n : ''); b.className = 'badge offline'; }
-  else if (n) { b.textContent = (flushing ? 'Sending ' : '') + n + (flushing ? '…' : ' to send'); b.className = 'badge pending'; }
-  else { b.textContent = 'Online'; b.className = 'badge'; }
+$('bulkCheck').addEventListener('click', () => {
+  const { plan, errors } = parseBulk($('bulkText').value);
+  const active = new Set(data.trays.map((t) => t.tray));
+  const exists = plan.filter((p) => active.has(p.tray)).map((p) => p.tray);
+  bulkPlan = plan.filter((p) => !active.has(p.tray));
+  const cut = bulkPlan.reduce((a, p) => a + p.mothers.reduce((b, m) => b + m.cuttings, 0), 0);
+  const notes = [];
+  if (errors.length) notes.push(errors.join(' · '));
+  if (exists.length) notes.push('Already active, will be skipped: ' + exists.join(', '));
+  msg('bulkMsg', (bulkPlan.length ? bulkPlan.length + ' new trays, ' + cut + ' cuttings, ' + bulkPlan.filter((p) => p.weigh).length + ' weighings. ' : 'Nothing to import. ') + notes.join(' | '), errors.length ? 'err' : 'ok');
+  $('bulkPrev').innerHTML = bulkPlan.length ? '<table><thead><tr><th>Tray</th><th>Cut</th><th>Mothers</th><th>Total</th><th>Weighing</th></tr></thead><tbody>' +
+    bulkPlan.map((p) => '<tr><td class="n">' + esc(p.tray) + '</td><td>' + p.start.slice(5).split('-').reverse().join('.') + '</td><td>' +
+      p.mothers.map((m) => esc(m.mother) + ' ' + m.cuttings).join(', ') + '</td><td>' + p.mothers.reduce((b, m) => b + m.cuttings, 0) + '</td><td>' +
+      (p.weigh ? g(p.weigh.grams) + ' (' + p.weigh.day.slice(5).split('-').reverse().join('.') + ')' : '—') + '</td></tr>').join('') + '</tbody></table>' : '';
+  $('bulkRun').disabled = !bulkPlan.length || errors.length > 0;
+});
+$('bulkRun').addEventListener('click', async () => {
+  if (!bulkPlan || !bulkPlan.length) return;
+  const btn = $('bulkRun'); btn.disabled = true; $('bulkCheck').disabled = true;
+  try {
+    const byDate = {};
+    bulkPlan.forEach((p) => { (byDate[p.start] = byDate[p.start] || []).push(p); });
+    for (const day of Object.keys(byDate).sort()) {
+      msg('bulkMsg', 'Adding trays cut on ' + day + '…', '');
+      await api('POST', { action: 'addTrays', startDate: day, trays: byDate[day].map((p) => ({ tray: p.tray, mothers: p.mothers })) });
+    }
+    const w = bulkPlan.filter((p) => p.weigh);
+    for (let i = 0; i < w.length; i++) {
+      msg('bulkMsg', 'Saving weighings ' + (i + 1) + ' / ' + w.length + '…', '');
+      const p = w[i];
+      await api('POST', { action: 'log', tray: p.tray, weight: p.weigh.grams, clientTimestamp: new Date(p.weigh.day + 'T09:00:00').toISOString(), submissionId: 'bulk-' + p.tray + '-' + p.weigh.day });
+    }
+    msg('bulkMsg', '✓ Imported ' + bulkPlan.length + ' trays and ' + w.length + ' weighings.', 'ok');
+    $('bulkText').value = ''; $('bulkPrev').innerHTML = ''; bulkPlan = null;
+    await reload();
+  } catch (err) {
+    msg('bulkMsg', 'Stopped: ' + err.message + ' – press Check again; trays already added will be skipped.', 'err');
+    await reload();
+  } finally { $('bulkCheck').disabled = false; }
+});
+
+/* ---------- trends ---------- */
+const FAST = 1.3, SLOW = 0.7, MIN_DIFF = 0.4;   // vs cycle median; MIN_DIFF in %-points per day
+async function loadTrends() {
+  try {
+    const res = await fetch(API_URL + '?action=trends&t=' + Date.now(), { redirect: 'follow' });
+    const j = JSON.parse(await res.text());
+    if (!j.ok) throw new Error(j.error);
+    renderTrends(j);
+  } catch (err) {
+    $('trendCard').style.display = 'block';
+    $('trendCharts').innerHTML = '<p class="muted">Trends need the newest Code.gs (deploy a New version). ' + esc(err.message || '') + '</p>';
+  }
 }
 
-/* ---------------- wire up ---------------- */
-$('weightInput').addEventListener('input', () => { state.bigOk = false; update(); });
-$('weightInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('weightInput').blur(); if (!$('saveBtn').disabled) save(); } });
-$('irrYes').addEventListener('click', () => { state.irrigated = true; state.irrTouched = true; buzz(25); update(); });
-$('irrNo').addEventListener('click', () => { state.irrigated = false; state.irrTouched = true; buzz(25); update(); });
-$('saveBtn').addEventListener('click', save);
-$('reloadBtn').addEventListener('click', () => { flush().then(loadRound); });
-window.addEventListener('online', () => { updateBadge(); flush(); });
-// New day while the app stayed open (e.g. left on the phone overnight) -> start a fresh round
-function checkNewDay() { if (state.data && state.data.today !== todayLocal() && !state.saving) flush().then(loadRound); }
-document.addEventListener('visibilitychange', () => { if (!document.hidden) checkNewDay(); });
-setInterval(checkNewDay, 5 * 60 * 1000);
-window.addEventListener('offline', updateBadge);
-setInterval(() => { if (navigator.onLine) flush(); }, 60000);
+function median(a) { if (!a.length) return null; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
 
-updateBadge();
-flush().then(loadRound);
+function analyse(t) {
+  const pts = t.points.filter((p) => p.w > 0);
+  const full = t.initialWeight > 0 ? t.initialWeight : (pts[0] ? pts[0].w : null);
+  const rates = [];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i];
+    if (a.irr === 'Yes') continue;                       // irrigated after weighing a – not a drying interval
+    const days = Math.max(1, Math.round((Date.parse(b.d) - Date.parse(a.d)) / 86400000));
+    const r = (a.w - b.w) / a.w * 100 / days;
+    if (r < 0) continue;                                 // weight went up – most likely watered
+    rates.push(r);
+  }
+  const lastP = pts[pts.length - 1];
+  return {
+    ...t, pts, full,
+    rate: rates.length ? rates.reduce((x, y) => x + y, 0) / rates.length : null,
+    nRates: rates.length,
+    fromFull: (full && lastP) ? (full - lastP.w) / full * 100 : null,
+    day: lastP && lastP.day != null ? lastP.day : null
+  };
+}
+
+function renderTrends(j) {
+  $('trendCard').style.display = 'block';
+  const all = j.trays.map(analyse);
+  const allMed = median(all.filter((t) => t.rate != null).map((t) => t.rate));
+  const groups = {};
+  all.forEach((t) => { (groups[t.startDate || '?'] = groups[t.startDate || '?'] || []).push(t); });
+  Object.values(groups).forEach((g) => {
+    const rs = g.filter((t) => t.rate != null).map((t) => t.rate);
+    const med = rs.length >= 3 ? median(rs) : allMed;   // small cycles compare against all trays
+    g.forEach((t) => {
+      t.med = med;
+      t.flag = null;
+      if (t.rate != null && med != null) {
+        if (t.rate >= med * FAST && t.rate - med >= MIN_DIFF) t.flag = 'fast';
+        else if (t.rate <= med * SLOW && med - t.rate >= MIN_DIFF) t.flag = 'slow';
+      }
+    });
+  });
+
+  // charts – one per cycle
+  const box = $('trendCharts'); box.innerHTML = '';
+  const limit = 100 - j.settings.DrybackIrrigatePct;
+  Object.keys(groups).sort().forEach((start) => {
+    const g = groups[start];
+    const div = document.createElement('div');
+    div.className = 'cohort';
+    const label = start === '?' ? 'No cutting date' : 'Cut ' + start.slice(5).split('-').reverse().join('.');
+    const nf = g.filter((t) => t.flag === 'fast').length, ns = g.filter((t) => t.flag === 'slow').length;
+    div.innerHTML = '<h3>' + label + ' · ' + g.length + ' trays</h3><div class="sub">' +
+      (nf || ns ? (nf ? nf + ' drying faster' : '') + (nf && ns ? ', ' : '') + (ns ? ns + ' drying slower' : '') : 'No tray stands out yet') +
+      '</div><div class="chartbox"></div>';
+    box.appendChild(div);
+    const host = div.querySelector('.chartbox');
+    host._args = [g, j.settings.CycleDays, limit];
+    drawChart(host, g, j.settings.CycleDays, limit);
+  });
+
+  // table – sorted by loss per day (fastest first)
+  const rows = [...all].sort((a, b) => (b.rate ?? -1) - (a.rate ?? -1));
+  $('trendBody').innerHTML = rows.map((t) => '<tr><td class="n">' + esc(t.tray) + '</td><td>' +
+    (t.startDate ? t.startDate.slice(5).split('-').reverse().join('.') : '—') + '</td><td>' + (t.day ?? '—') + '</td><td>' +
+    (t.rate != null ? '<b>' + t.rate.toFixed(1) + '%</b>' + (t.nRates < 2 ? ' <span class="muted">(1 day)</span>' : '') : '<span class="muted">need 2 days</span>') + '</td><td>' +
+    (t.med != null ? t.med.toFixed(1) + '%' : '—') + '</td><td>' + (t.fromFull != null ? t.fromFull.toFixed(1) + '%' : '—') + '</td><td>' +
+    (t.flag === 'fast' ? '<span class="flag fast">▲ faster</span>' : t.flag === 'slow' ? '<span class="flag slow">▼ slower</span>' : '') + '</td></tr>').join('');
+}
+
+function drawChart(host, trays, cycleDays, limitPct) {
+  const W = Math.max(300, Math.round(host.clientWidth || 640)), H = W < 500 ? 200 : 230, m = { l: 40, r: 44, t: 10, b: 26 };
+  const days = Math.max(cycleDays, ...trays.flatMap((t) => t.pts.map((p) => p.day ?? 0)));
+  let lo = Math.min(limitPct - 3, ...trays.flatMap((t) => t.pts.map((p) => p.w / t.full * 100)));
+  let hi = Math.max(101, ...trays.flatMap((t) => t.pts.map((p) => p.w / t.full * 100)));
+  lo = Math.floor(lo / 5) * 5; hi = Math.ceil(hi / 5) * 5;
+  const x = (d) => m.l + (d / days) * (W - m.l - m.r);
+  const y = (v) => m.t + (hi - v) / (hi - lo) * (H - m.t - m.b);
+  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Weight as percent of full weight by day">';
+  for (let v = lo; v <= hi; v += 5) svg += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="var(--c-grid)"/><text x="' + (m.l - 6) + '" y="' + (y(v) + 4) + '" font-size="11" text-anchor="end" fill="#5f6b5f">' + v + '%</text>';
+  const step = W < 500 ? 3 : 2;
+  for (let d = 0; d <= days; d += step) svg += '<text x="' + x(d) + '" y="' + (H - 8) + '" font-size="11" text-anchor="middle" fill="#5f6b5f">' + d + '</text>';
+  svg += '<text x="' + m.l + '" y="' + (m.t + 2) + '" font-size="11" fill="#5f6b5f" dx="4" dy="8">% of full weight</text>';
+  svg += '<text x="' + (W - m.r + 6) + '" y="' + (H - 8) + '" font-size="11" fill="#5f6b5f">days</text>';
+  svg += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + y(limitPct) + '" y2="' + y(limitPct) + '" stroke="var(--c-ref)" stroke-dasharray="5 4" stroke-width="1.5"/>';
+  const order = [...trays].sort((a, b) => (a.flag ? 1 : 0) - (b.flag ? 1 : 0)); // highlighted lines on top
+  order.forEach((t) => {
+    if (!t.pts.length || !t.full) return;
+    const pts = t.pts.filter((p) => p.day != null).map((p) => [x(p.day), y(p.w / t.full * 100)]);
+    if (!pts.length) return;
+    const col = t.flag === 'fast' ? 'var(--c-fast)' : t.flag === 'slow' ? 'var(--c-slow)' : 'var(--c-ctx)';
+    const d = 'M' + pts.map((p) => p.join(',')).join('L');
+    svg += '<g data-tray="' + esc(t.tray) + '">';
+    svg += '<path d="' + d + '" fill="none" stroke="' + col + '" stroke-width="' + (t.flag ? 2.5 : 1.5) + '" stroke-linejoin="round" stroke-linecap="round"/>';
+    if (t.flag) {
+      t.pts.forEach((p) => { if (p.irr === 'Yes' && p.day != null) svg += '<circle cx="' + x(p.day) + '" cy="' + y(p.w / t.full * 100) + '" r="4" fill="' + col + '" stroke="#fff" stroke-width="2"/>'; });
+      const e = pts[pts.length - 1];
+      svg += '<text x="' + (e[0] + 6) + '" y="' + (e[1] + 4) + '" font-size="12" font-weight="700" fill="#1a1a1a">' + esc(t.tray) + '</text>';
+    }
+    svg += '<path d="' + d + '" fill="none" stroke="transparent" stroke-width="14" style="cursor:pointer"/></g>';
+  });
+  svg += '</svg><div class="tip"></div>';
+  host.innerHTML = svg;
+  const tip = host.querySelector('.tip');
+  host.querySelectorAll('g[data-tray]').forEach((gEl) => {
+    const t = trays.find((z) => z.tray === gEl.dataset.tray);
+    const show = (ev) => {
+      const r = host.getBoundingClientRect();
+      const px = (ev.clientX - r.left) / r.width * W;
+      let best = t.pts[0];
+      t.pts.forEach((p) => { if (p.day != null && Math.abs(x(p.day) - px) < Math.abs(x(best.day) - px)) best = p; });
+      tip.innerHTML = '<b>Tray ' + esc(t.tray) + '</b> · day ' + best.day + '<br>' + g(best.w) + ' = ' + (best.w / t.full * 100).toFixed(1) + '% of full' +
+        (best.irr === 'Yes' ? ' · 💧' : '') + '<br>Loss/day: ' + (t.rate != null ? t.rate.toFixed(1) + '%' : '—') + ' (median ' + (t.med != null ? t.med.toFixed(1) : '—') + '%)';
+      tip.style.display = 'block';
+      const tx = Math.min(ev.clientX - r.left + 12, r.width - tip.offsetWidth - 4);
+      tip.style.left = Math.max(0, tx) + 'px'; tip.style.top = (ev.clientY - r.top + 12) + 'px';
+      gEl.querySelector('path').setAttribute('stroke-width', '3.5');
+    };
+    gEl.addEventListener('mousemove', show);
+    gEl.addEventListener('click', show);
+    gEl.addEventListener('mouseleave', () => { tip.style.display = 'none'; gEl.querySelector('path').setAttribute('stroke-width', t.flag ? '2.5' : '1.5'); });
+  });
+}
+
+let resizeT;
+window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => {
+  document.querySelectorAll('.chartbox').forEach((h) => { if (h._args) drawChart(h, ...h._args); });
+}, 200); });
+
+/* ---------- close trays ---------- */
+$('closeBtn').addEventListener('click', async () => {
+  const list = [...selected];
+  if (!confirm('Close trays ' + list.join(', ') + '? They will leave the morning round. History stays in the sheet.')) return;
+  $('closeBtn').disabled = true; msg('closeMsg', '');
+  try {
+    const res = await api('POST', { action: 'closeTrays', trays: list });
+    msg('closeMsg', '✓ Closed ' + res.changed + ' tray' + (res.changed === 1 ? '' : 's') + '.', 'ok');
+    selected = new Set();
+    await reload();
+  } catch (err) { msg('closeMsg', err.message, 'err'); updSel(); }
+});
+
+/* ---------- settings ---------- */
+$('saveSetBtn').addEventListener('click', async () => {
+  $('saveSetBtn').disabled = true; msg('setMsg', '');
+  try {
+    await api('POST', { action: 'setSettings', settings: { DrybackIrrigatePct: $('sDb').value, RootCheckDay: $('sRoot').value, CycleDays: $('sCycle').value } });
+    msg('setMsg', '✓ Saved', 'ok');
+    await reload();
+  } catch (err) { msg('setMsg', err.message, 'err'); }
+  finally { $('saveSetBtn').disabled = false; }
+});
+
+reload();
 </script>
 </body>
 </html>
