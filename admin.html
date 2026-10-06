@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="format-detection" content="telephone=no">
+<title>Tray Admin</title>
+<style>
+  :root { --green: #1b5e20; --green-2: #2e7d32; --green-light: #e8f5e9; --blue: #1565c0; --red: #c62828; --amber: #ef6c00; --ink: #1a1a1a; --muted: #5f6b5f; --line: #d5dcd5; --bg: #f3f6f3; }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: var(--bg); color: var(--ink); font-size: 16px; }
+  header { background: var(--green); color: #fff; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 5; }
+  header h1 { margin: 0; font-size: 19px; }
+  header a { color: #fff; font-size: 14px; }
+  main { max-width: 900px; margin: 0 auto; padding: 14px; }
+  .card { background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
+  input, select { font: inherit; border: 2px solid var(--line); border-radius: 8px; padding: 8px 10px; background: #fff; min-height: 42px; -webkit-appearance: none; appearance: none; }
+  input[type=checkbox] { -webkit-appearance: checkbox; appearance: auto; padding: 0; min-height: auto; width: 22px; height: 22px; accent-color: var(--green-2); }
+  input:focus { outline: none; border-color: var(--green-2); }
+  button { font: inherit; font-weight: 700; border: 0; border-radius: 10px; padding: 10px 16px; cursor: pointer; min-height: 44px; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .primary { background: var(--green-2); color: #fff; }
+  .secondary { background: #eef2ee; border: 2px solid var(--line); color: var(--ink); }
+  .danger { background: #ffebee; border: 2px solid #f3c1c1; color: var(--red); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .msg { font-weight: 700; margin-top: 8px; min-height: 20px; }
+  .msg.ok { color: var(--green-2); } .msg.err { color: var(--red); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { padding: 8px 6px; border-bottom: 1px solid #eef0ee; text-align: left; vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  td.n { font-weight: 800; font-size: 16px; }
+  .pill { display: inline-block; padding: 2px 7px; border-radius: 6px; font-size: 12px; font-weight: 800; }
+  .pill.todo { background: #fff3e0; color: var(--amber); } .pill.ok { background: var(--green-light); color: var(--green); } .pill.irr { background: #e3f2fd; color: var(--blue); }
+  .settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+  label { display: block; font-size: 13px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+  .settings input { width: 100%; }
+  .tray-ed { border: 2px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 10px; }
+  .tray-ed .top { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+  .tray-ed .top .no input { width: 90px; font-weight: 800; font-size: 18px; text-align: center; }
+  .tray-ed .top .iw input { width: 130px; }
+  .mrow { display: grid; grid-template-columns: 1fr 110px 44px; gap: 8px; margin-top: 8px; }
+  .mrow input { width: 100%; min-width: 0; }
+  .x { background: none; color: var(--muted); font-size: 20px; padding: 0; min-height: 42px; }
+  .spinner { width: 18px; height: 18px; border: 3px solid rgba(0,0,0,.12); border-top-color: var(--green-2); border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<header><h1>🛠️ Tray Admin</h1><a href="./">Morning round →</a></header>
+<main>
+  <div id="loading" class="card"><span class="spinner"></span> Loading…</div>
+
+  <!-- ADD TRAYS -->
+  <section class="card" id="addCard" style="display:none">
+    <h2>Add trays</h2>
+    <div class="row" style="margin-bottom:10px">
+      <div><label for="startDate">Cutting date (day 0)</label><input type="date" id="startDate"></div>
+    </div>
+    <div id="trayEds"></div>
+    <div class="row">
+      <button class="secondary" id="addTrayBtn" type="button">➕ Tray</button>
+      <button class="secondary" id="dupTrayBtn" type="button">⧉ Copy last tray</button>
+      <span style="flex:1"></span>
+      <button class="primary" id="saveTraysBtn" type="button">Save trays</button>
+    </div>
+    <p class="muted">Write the tray number on the tray with a marker. Initial weight is optional – if empty, the worker's first weighing becomes the full weight (weigh right after watering).</p>
+    <div class="msg" id="addMsg"></div>
+    <datalist id="motherList"></datalist>
+  </section>
+
+  <!-- ACTIVE -->
+  <section class="card" id="activeCard" style="display:none">
+    <h2>Active trays <span id="activeCount"></span></h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th></th><th>Tray</th><th>Day</th><th>Mothers (rooted / cut)</th><th>Full</th><th>Today</th><th>Dryback</th></tr></thead>
+        <tbody id="activeBody"></tbody>
+      </table>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="danger" id="closeBtn" type="button" disabled>Close selected (transplanted)</button>
+      <span class="muted" id="selInfo"></span>
+    </div>
+    <div class="msg" id="closeMsg"></div>
+  </section>
+
+  <!-- RANKING -->
+  <section class="card" id="rankCard" style="display:none">
+    <h2>Mother ranking (rooting %)</h2>
+    <div class="table-wrap"><table><thead><tr><th>#</th><th>Mother</th><th>Rooting</th><th>Rooted / counted</th><th>Not counted yet</th></tr></thead><tbody id="rankBody"></tbody></table></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="card" id="setCard" style="display:none">
+    <h2>Settings</h2>
+    <div class="settings">
+      <div><label for="sDb">Irrigate when dryback ≥ (%)</label><input id="sDb" type="number" min="1" max="90" step="0.5"></div>
+      <div><label for="sRoot">Rooting check from day</label><input id="sRoot" type="number" min="1" max="60" step="1"></div>
+      <div><label for="sCycle">Transplant on day</label><input id="sCycle" type="number" min="1" max="90" step="1"></div>
+    </div>
+    <div class="row" style="margin-top:10px"><button class="primary" id="saveSetBtn" type="button">Save settings</button></div>
+    <div class="msg" id="setMsg"></div>
+  </section>
+</main>
+
+<script>
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyOsuvirg1KZs6F2uKJ0KAy2tVHMiu-_iAiulwBLsbynybTMmjjiyhK_IptGJjPOESR/exec';
+const API_URL = WEB_APP_URL.trim().replace(/[?#].*$/, '');
+const $ = (id) => document.getElementById(id);
+let data = null;
+let selected = new Set();
+
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function g(n) { return (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString(undefined, { maximumFractionDigits: 1 }) + ' g'; }
+function msg(id, text, cls) { $(id).textContent = text; $(id).className = 'msg ' + (cls || ''); }
+async function api(method, body) {
+  const url = method === 'GET' ? API_URL + '?action=round&t=' + Date.now() : API_URL;
+  const opt = method === 'GET' ? {} : { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) };
+  let res;
+  try { res = await fetch(url, { ...opt, redirect: 'follow' }); } catch (e) { throw new Error('No connection to the server.'); }
+  const text = await res.text();
+  let j; try { j = JSON.parse(text); } catch (e) { throw new Error('Server returned an error page – check that the newest Code.gs is deployed (New version).'); }
+  if (!j.ok) throw new Error(j.error || 'Request failed');
+  return j;
+}
+function localToday() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+
+async function reload() {
+  try {
+    data = await api('GET');
+    $('loading').style.display = 'none';
+    ['addCard', 'activeCard', 'rankCard', 'setCard'].forEach((id) => { $(id).style.display = 'block'; });
+    render();
+  } catch (err) {
+    $('loading').innerHTML = '⚠️ ' + esc(err.message) + ' <button class="secondary" onclick="reload()">Try again</button>';
+  }
+}
+
+function render() {
+  // mothers datalist
+  $('motherList').innerHTML = data.mothers.map((m) => '<option value="' + esc(m) + '">').join('');
+  // settings
+  $('sDb').value = data.settings.DrybackIrrigatePct; $('sRoot').value = data.settings.RootCheckDay; $('sCycle').value = data.settings.CycleDays;
+  // active
+  selected = new Set([...selected].filter((t) => data.trays.some((x) => x.tray === t)));
+  $('activeCount').textContent = '(' + data.trays.length + ')';
+  const tb = $('activeBody'); tb.innerHTML = '';
+  if (!data.trays.length) tb.innerHTML = '<tr><td colspan="7" class="muted">No active trays yet.</td></tr>';
+  data.trays.forEach((t) => {
+    const ready = t.day != null && t.day >= data.settings.CycleDays;
+    const mothers = (t.cuttings || []).map((c) => esc(c.mother || 'No mother') + ' ' +
+      (c.rooted != null ? '<b>' + c.rooted + '</b>/' + c.initial + ' (' + c.rootingPct + '%)' : '<span class="muted">–/' + c.initial + '</span>')).join('<br>') || '<span class="muted">—</span>';
+    const db = (t.initialWeight > 0 && t.todayWeight > 0) ? ((t.initialWeight - t.todayWeight) / t.initialWeight * 100).toFixed(1) + '%' : '—';
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td><input type="checkbox"' + (selected.has(t.tray) ? ' checked' : '') + ' style="min-height:auto;width:20px;height:20px"></td>' +
+      '<td class="n">' + esc(t.tray) + '</td>' +
+      '<td>' + (t.day != null ? t.day : '—') + (ready ? ' <span class="pill ok">transplant</span>' : t.needsRootCount ? ' <span class="pill todo">count roots</span>' : '') + '</td>' +
+      '<td>' + mothers + '</td><td>' + g(t.initialWeight) + '</td>' +
+      '<td>' + (t.todayWeight != null ? g(t.todayWeight) + (t.todayIrrigated === 'Yes' ? ' <span class="pill irr">💧</span>' : '') : '<span class="pill todo">not yet</span>') + '</td>' +
+      '<td>' + db + '</td>';
+    tr.querySelector('input').addEventListener('change', (e) => { e.target.checked ? selected.add(t.tray) : selected.delete(t.tray); updSel(); });
+    tb.appendChild(tr);
+  });
+  updSel();
+  // ranking
+  const rb = $('rankBody');
+  rb.innerHTML = data.ranking.length ? data.ranking.map((r) => '<tr><td>' + (r.rank || '') + '</td><td><b>' + esc(r.mother) + '</b></td><td>' +
+    (r.pct != null ? '<b>' + r.pct + '%</b>' : '—') + '</td><td>' + (r.counted ? r.rooted + ' / ' + r.counted : '—') + '</td><td>' + (r.pending || '') + '</td></tr>').join('')
+    : '<tr><td colspan="5" class="muted">No cuttings recorded yet.</td></tr>';
+  // tray editors
+  if (!$('trayEds').children.length) { $('startDate').value = localToday(); addTrayEd(); }
+  renumber();
+}
+
+function updSel() {
+  $('closeBtn').disabled = !selected.size;
+  $('selInfo').textContent = selected.size ? 'Trays ' + [...selected].join(', ') : '';
+}
+
+/* ---------- add-trays editor ---------- */
+function addTrayEd(copyFrom) {
+  const box = document.createElement('div');
+  box.className = 'tray-ed';
+  box.innerHTML = '<div class="top">' +
+    '<div class="no"><label>Tray #</label><input type="text" inputmode="numeric" class="tno"></div>' +
+    '<div class="iw"><label>Initial weight (g)</label><input type="number" inputmode="decimal" class="tiw" placeholder="optional"></div>' +
+    '<span style="flex:1"></span><button type="button" class="x rm" title="Remove tray">✕</button></div>' +
+    '<div class="ms"></div>' +
+    '<button type="button" class="secondary addm" style="margin-top:8px;min-height:38px;padding:6px 12px;font-size:14px">+ mother</button>';
+  const ms = box.querySelector('.ms');
+  const addM = (m, c) => {
+    const r = document.createElement('div');
+    r.className = 'mrow';
+    r.innerHTML = '<input type="text" list="motherList" placeholder="Mother" class="mm"><input type="number" inputmode="numeric" min="1" step="1" placeholder="Cuttings" class="mc"><button type="button" class="x">✕</button>';
+    r.querySelector('.mm').value = m || ''; r.querySelector('.mc').value = c || '';
+    r.querySelector('.x').addEventListener('click', () => r.remove());
+    ms.appendChild(r);
+  };
+  if (copyFrom) { copyFrom.querySelectorAll('.mrow').forEach((r) => addM(r.querySelector('.mm').value, r.querySelector('.mc').value)); }
+  if (!ms.children.length) addM();
+  box.querySelector('.addm').addEventListener('click', () => addM());
+  box.querySelector('.rm').addEventListener('click', () => { box.remove(); renumber(); });
+  box.querySelector('.tno').addEventListener('input', (e) => { e.target.dataset.manual = '1'; });
+  $('trayEds').appendChild(box);
+  renumber();
+}
+
+function renumber() {
+  // suggest numbers for editors the admin hasn't typed into
+  if (!data) return;
+  const used = new Set(data.trays.map((t) => t.tray));
+  let n = data.nextNumber;
+  $('trayEds').querySelectorAll('.tno').forEach((inp) => { if (inp.dataset.manual && inp.value.trim()) used.add(inp.value.trim()); });
+  $('trayEds').querySelectorAll('.tno').forEach((inp) => {
+    if (inp.dataset.manual && inp.value.trim()) return;
+    while (used.has(String(n))) n++;
+    inp.value = n; used.add(String(n)); n++;
+  });
+}
+
+$('addTrayBtn').addEventListener('click', () => addTrayEd());
+$('dupTrayBtn').addEventListener('click', () => { const eds = $('trayEds').children; addTrayEd(eds.length ? eds[eds.length - 1] : null); });
+
+$('saveTraysBtn').addEventListener('click', async () => {
+  const trays = [];
+  for (const ed of $('trayEds').children) {
+    const mothers = [];
+    for (const r of ed.querySelectorAll('.mrow')) {
+      const m = r.querySelector('.mm').value.trim(), c = r.querySelector('.mc').value.trim();
+      if (!m && !c) continue;
+      if (!/^\d+$/.test(c) || +c < 1) { msg('addMsg', 'Tray ' + ed.querySelector('.tno').value + ': enter the number of cuttings for ' + (m || 'each mother') + '.', 'err'); return; }
+      mothers.push({ mother: m, cuttings: +c });
+    }
+    trays.push({ tray: ed.querySelector('.tno').value.trim(), initialWeight: ed.querySelector('.tiw').value.trim(), mothers });
+  }
+  if (!trays.length) { msg('addMsg', 'Add at least one tray.', 'err'); return; }
+  const btn = $('saveTraysBtn'); btn.disabled = true; btn.textContent = 'Saving…'; msg('addMsg', '');
+  try {
+    const res = await api('POST', { action: 'addTrays', startDate: $('startDate').value, trays });
+    msg('addMsg', '✓ Added trays ' + res.added.join(', ') + ' (day 0 = ' + res.startDate + ')', 'ok');
+    $('trayEds').innerHTML = '';
+    await reload();
+  } catch (err) { msg('addMsg', err.message, 'err'); }
+  finally { btn.disabled = false; btn.textContent = 'Save trays'; }
+});
+
+/* ---------- close trays ---------- */
+$('closeBtn').addEventListener('click', async () => {
+  const list = [...selected];
+  if (!confirm('Close trays ' + list.join(', ') + '? They will leave the morning round. History stays in the sheet.')) return;
+  $('closeBtn').disabled = true; msg('closeMsg', '');
+  try {
+    const res = await api('POST', { action: 'closeTrays', trays: list });
+    msg('closeMsg', '✓ Closed ' + res.changed + ' tray' + (res.changed === 1 ? '' : 's') + '.', 'ok');
+    selected = new Set();
+    await reload();
+  } catch (err) { msg('closeMsg', err.message, 'err'); updSel(); }
+});
+
+/* ---------- settings ---------- */
+$('saveSetBtn').addEventListener('click', async () => {
+  $('saveSetBtn').disabled = true; msg('setMsg', '');
+  try {
+    await api('POST', { action: 'setSettings', settings: { DrybackIrrigatePct: $('sDb').value, RootCheckDay: $('sRoot').value, CycleDays: $('sCycle').value } });
+    msg('setMsg', '✓ Saved', 'ok');
+    await reload();
+  } catch (err) { msg('setMsg', err.message, 'err'); }
+  finally { $('saveSetBtn').disabled = false; }
+});
+
+reload();
+</script>
+</body>
+</html>
