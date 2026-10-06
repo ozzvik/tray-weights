@@ -45,6 +45,18 @@
   .mrow { display: grid; grid-template-columns: 1fr 110px 44px; gap: 8px; margin-top: 8px; }
   .mrow input { width: 100%; min-width: 0; }
   .x { background: none; color: var(--muted); font-size: 20px; padding: 0; min-height: 42px; }
+  .viz { --c-fast: #eb6834; --c-slow: #2a78d6; --c-ctx: #c9cdc9; --c-grid: #e6e9e6; --c-ref: #8a8f8a; }
+  .cohort { margin: 6px 0 18px; }
+  .cohort h3 { font-size: 15px; margin: 0 0 2px; }
+  .cohort .sub { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .chartbox { position: relative; }
+  .chartbox svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); margin: 4px 0 10px; }
+  .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .tip { position: absolute; pointer-events: none; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.12); white-space: nowrap; display: none; z-index: 3; }
+  .tip b { font-size: 14px; }
+  .flag { font-weight: 800; font-size: 12px; padding: 2px 7px; border-radius: 6px; white-space: nowrap; }
+  .flag.fast { background: #fde7dd; color: #b8461b; } .flag.slow { background: #e1edfb; color: #1d5ea8; }
   .spinner { width: 18px; height: 18px; border: 3px solid rgba(0,0,0,.12); border-top-color: var(--green-2); border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; vertical-align: middle; }
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
@@ -102,6 +114,27 @@
     <div class="msg" id="closeMsg"></div>
   </section>
 
+  <!-- TRENDS -->
+  <section class="card viz" id="trendCard" style="display:none">
+    <h2>Trends – weight loss per tray</h2>
+    <p class="muted" style="margin-top:0">Each line is a tray: weight as % of its full weight, by day. Trays that lose weight
+      clearly <b>faster</b> or <b>slower</b> than the others in the same cycle are highlighted.
+      Days right after an irrigation are left out of the loss rate.</p>
+    <div class="legend">
+      <span><i style="background:var(--c-fast)"></i>Drying faster</span>
+      <span><i style="background:var(--c-slow)"></i>Drying slower</span>
+      <span><i style="background:var(--c-ctx)"></i>Other trays</span>
+      <span><i style="background:none;border-top:2px dashed var(--c-ref);height:0"></i>Irrigation limit</span>
+    </div>
+    <div id="trendCharts"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Tray</th><th>Cycle</th><th>Day</th><th>Loss / day</th><th>Cycle median</th><th>From full now</th><th></th></tr></thead>
+        <tbody id="trendBody"></tbody>
+      </table>
+    </div>
+  </section>
+
   <!-- RANKING -->
   <section class="card" id="rankCard" style="display:none">
     <h2>Mother ranking (rooting %)</h2>
@@ -149,6 +182,7 @@ async function reload() {
     $('loading').style.display = 'none';
     ['addCard', 'bulkCard', 'activeCard', 'rankCard', 'setCard'].forEach((id) => { $(id).style.display = 'block'; });
     render();
+    loadTrends();
   } catch (err) {
     $('loading').innerHTML = '⚠️ ' + esc(err.message) + ' <button class="secondary" onclick="reload()">Try again</button>';
   }
@@ -347,6 +381,149 @@ $('bulkRun').addEventListener('click', async () => {
     await reload();
   } finally { $('bulkCheck').disabled = false; }
 });
+
+/* ---------- trends ---------- */
+const FAST = 1.3, SLOW = 0.7, MIN_DIFF = 0.4;   // vs cycle median; MIN_DIFF in %-points per day
+async function loadTrends() {
+  try {
+    const res = await fetch(API_URL + '?action=trends&t=' + Date.now(), { redirect: 'follow' });
+    const j = JSON.parse(await res.text());
+    if (!j.ok) throw new Error(j.error);
+    renderTrends(j);
+  } catch (err) {
+    $('trendCard').style.display = 'block';
+    $('trendCharts').innerHTML = '<p class="muted">Trends need the newest Code.gs (deploy a New version). ' + esc(err.message || '') + '</p>';
+  }
+}
+
+function median(a) { if (!a.length) return null; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+
+function analyse(t) {
+  const pts = t.points.filter((p) => p.w > 0);
+  const full = t.initialWeight > 0 ? t.initialWeight : (pts[0] ? pts[0].w : null);
+  const rates = [];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i];
+    if (a.irr === 'Yes') continue;                       // irrigated after weighing a – not a drying interval
+    const days = Math.max(1, Math.round((Date.parse(b.d) - Date.parse(a.d)) / 86400000));
+    const r = (a.w - b.w) / a.w * 100 / days;
+    if (r < 0) continue;                                 // weight went up – most likely watered
+    rates.push(r);
+  }
+  const lastP = pts[pts.length - 1];
+  return {
+    ...t, pts, full,
+    rate: rates.length ? rates.reduce((x, y) => x + y, 0) / rates.length : null,
+    nRates: rates.length,
+    fromFull: (full && lastP) ? (full - lastP.w) / full * 100 : null,
+    day: lastP && lastP.day != null ? lastP.day : null
+  };
+}
+
+function renderTrends(j) {
+  $('trendCard').style.display = 'block';
+  const all = j.trays.map(analyse);
+  const allMed = median(all.filter((t) => t.rate != null).map((t) => t.rate));
+  const groups = {};
+  all.forEach((t) => { (groups[t.startDate || '?'] = groups[t.startDate || '?'] || []).push(t); });
+  Object.values(groups).forEach((g) => {
+    const rs = g.filter((t) => t.rate != null).map((t) => t.rate);
+    const med = rs.length >= 3 ? median(rs) : allMed;   // small cycles compare against all trays
+    g.forEach((t) => {
+      t.med = med;
+      t.flag = null;
+      if (t.rate != null && med != null) {
+        if (t.rate >= med * FAST && t.rate - med >= MIN_DIFF) t.flag = 'fast';
+        else if (t.rate <= med * SLOW && med - t.rate >= MIN_DIFF) t.flag = 'slow';
+      }
+    });
+  });
+
+  // charts – one per cycle
+  const box = $('trendCharts'); box.innerHTML = '';
+  const limit = 100 - j.settings.DrybackIrrigatePct;
+  Object.keys(groups).sort().forEach((start) => {
+    const g = groups[start];
+    const div = document.createElement('div');
+    div.className = 'cohort';
+    const label = start === '?' ? 'No cutting date' : 'Cut ' + start.slice(5).split('-').reverse().join('.');
+    const nf = g.filter((t) => t.flag === 'fast').length, ns = g.filter((t) => t.flag === 'slow').length;
+    div.innerHTML = '<h3>' + label + ' · ' + g.length + ' trays</h3><div class="sub">' +
+      (nf || ns ? (nf ? nf + ' drying faster' : '') + (nf && ns ? ', ' : '') + (ns ? ns + ' drying slower' : '') : 'No tray stands out yet') +
+      '</div><div class="chartbox"></div>';
+    box.appendChild(div);
+    const host = div.querySelector('.chartbox');
+    host._args = [g, j.settings.CycleDays, limit];
+    drawChart(host, g, j.settings.CycleDays, limit);
+  });
+
+  // table – sorted by loss per day (fastest first)
+  const rows = [...all].sort((a, b) => (b.rate ?? -1) - (a.rate ?? -1));
+  $('trendBody').innerHTML = rows.map((t) => '<tr><td class="n">' + esc(t.tray) + '</td><td>' +
+    (t.startDate ? t.startDate.slice(5).split('-').reverse().join('.') : '—') + '</td><td>' + (t.day ?? '—') + '</td><td>' +
+    (t.rate != null ? '<b>' + t.rate.toFixed(1) + '%</b>' + (t.nRates < 2 ? ' <span class="muted">(1 day)</span>' : '') : '<span class="muted">need 2 days</span>') + '</td><td>' +
+    (t.med != null ? t.med.toFixed(1) + '%' : '—') + '</td><td>' + (t.fromFull != null ? t.fromFull.toFixed(1) + '%' : '—') + '</td><td>' +
+    (t.flag === 'fast' ? '<span class="flag fast">▲ faster</span>' : t.flag === 'slow' ? '<span class="flag slow">▼ slower</span>' : '') + '</td></tr>').join('');
+}
+
+function drawChart(host, trays, cycleDays, limitPct) {
+  const W = Math.max(300, Math.round(host.clientWidth || 640)), H = W < 500 ? 200 : 230, m = { l: 40, r: 44, t: 10, b: 26 };
+  const days = Math.max(cycleDays, ...trays.flatMap((t) => t.pts.map((p) => p.day ?? 0)));
+  let lo = Math.min(limitPct - 3, ...trays.flatMap((t) => t.pts.map((p) => p.w / t.full * 100)));
+  let hi = Math.max(101, ...trays.flatMap((t) => t.pts.map((p) => p.w / t.full * 100)));
+  lo = Math.floor(lo / 5) * 5; hi = Math.ceil(hi / 5) * 5;
+  const x = (d) => m.l + (d / days) * (W - m.l - m.r);
+  const y = (v) => m.t + (hi - v) / (hi - lo) * (H - m.t - m.b);
+  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Weight as percent of full weight by day">';
+  for (let v = lo; v <= hi; v += 5) svg += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="var(--c-grid)"/><text x="' + (m.l - 6) + '" y="' + (y(v) + 4) + '" font-size="11" text-anchor="end" fill="#5f6b5f">' + v + '%</text>';
+  const step = W < 500 ? 3 : 2;
+  for (let d = 0; d <= days; d += step) svg += '<text x="' + x(d) + '" y="' + (H - 8) + '" font-size="11" text-anchor="middle" fill="#5f6b5f">' + d + '</text>';
+  svg += '<text x="' + m.l + '" y="' + (m.t + 2) + '" font-size="11" fill="#5f6b5f" dx="4" dy="8">% of full weight</text>';
+  svg += '<text x="' + (W - m.r + 6) + '" y="' + (H - 8) + '" font-size="11" fill="#5f6b5f">days</text>';
+  svg += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + y(limitPct) + '" y2="' + y(limitPct) + '" stroke="var(--c-ref)" stroke-dasharray="5 4" stroke-width="1.5"/>';
+  const order = [...trays].sort((a, b) => (a.flag ? 1 : 0) - (b.flag ? 1 : 0)); // highlighted lines on top
+  order.forEach((t) => {
+    if (!t.pts.length || !t.full) return;
+    const pts = t.pts.filter((p) => p.day != null).map((p) => [x(p.day), y(p.w / t.full * 100)]);
+    if (!pts.length) return;
+    const col = t.flag === 'fast' ? 'var(--c-fast)' : t.flag === 'slow' ? 'var(--c-slow)' : 'var(--c-ctx)';
+    const d = 'M' + pts.map((p) => p.join(',')).join('L');
+    svg += '<g data-tray="' + esc(t.tray) + '">';
+    svg += '<path d="' + d + '" fill="none" stroke="' + col + '" stroke-width="' + (t.flag ? 2.5 : 1.5) + '" stroke-linejoin="round" stroke-linecap="round"/>';
+    if (t.flag) {
+      t.pts.forEach((p) => { if (p.irr === 'Yes' && p.day != null) svg += '<circle cx="' + x(p.day) + '" cy="' + y(p.w / t.full * 100) + '" r="4" fill="' + col + '" stroke="#fff" stroke-width="2"/>'; });
+      const e = pts[pts.length - 1];
+      svg += '<text x="' + (e[0] + 6) + '" y="' + (e[1] + 4) + '" font-size="12" font-weight="700" fill="#1a1a1a">' + esc(t.tray) + '</text>';
+    }
+    svg += '<path d="' + d + '" fill="none" stroke="transparent" stroke-width="14" style="cursor:pointer"/></g>';
+  });
+  svg += '</svg><div class="tip"></div>';
+  host.innerHTML = svg;
+  const tip = host.querySelector('.tip');
+  host.querySelectorAll('g[data-tray]').forEach((gEl) => {
+    const t = trays.find((z) => z.tray === gEl.dataset.tray);
+    const show = (ev) => {
+      const r = host.getBoundingClientRect();
+      const px = (ev.clientX - r.left) / r.width * W;
+      let best = t.pts[0];
+      t.pts.forEach((p) => { if (p.day != null && Math.abs(x(p.day) - px) < Math.abs(x(best.day) - px)) best = p; });
+      tip.innerHTML = '<b>Tray ' + esc(t.tray) + '</b> · day ' + best.day + '<br>' + g(best.w) + ' = ' + (best.w / t.full * 100).toFixed(1) + '% of full' +
+        (best.irr === 'Yes' ? ' · 💧' : '') + '<br>Loss/day: ' + (t.rate != null ? t.rate.toFixed(1) + '%' : '—') + ' (median ' + (t.med != null ? t.med.toFixed(1) : '—') + '%)';
+      tip.style.display = 'block';
+      const tx = Math.min(ev.clientX - r.left + 12, r.width - tip.offsetWidth - 4);
+      tip.style.left = Math.max(0, tx) + 'px'; tip.style.top = (ev.clientY - r.top + 12) + 'px';
+      gEl.querySelector('path').setAttribute('stroke-width', '3.5');
+    };
+    gEl.addEventListener('mousemove', show);
+    gEl.addEventListener('click', show);
+    gEl.addEventListener('mouseleave', () => { tip.style.display = 'none'; gEl.querySelector('path').setAttribute('stroke-width', t.flag ? '2.5' : '1.5'); });
+  });
+}
+
+let resizeT;
+window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => {
+  document.querySelectorAll('.chartbox').forEach((h) => { if (h._args) drawChart(h, ...h._args); });
+}, 200); });
 
 /* ---------- close trays ---------- */
 $('closeBtn').addEventListener('click', async () => {
