@@ -309,6 +309,7 @@ function select(i) {
   $('weightInput').value = t.todayWeight != null ? t.todayWeight : '';
   state.irrigated = t.todayWeight != null ? t.todayIrrigated === 'Yes' : null;
   state.irrTouched = t.todayWeight != null;
+  state.bigOk = false;
 
   renderRoots(t);
   update();
@@ -330,7 +331,10 @@ function renderRoots(t) {
   box._batches = open;
 }
 
-function currentWeight() { const v = parseFloat(String($('weightInput').value).replace(',', '.')); return isFinite(v) ? v : NaN; }
+const KG_LIMIT = 50;           // anything typed below 50 is read as kilograms (3.36 -> 3360 g)
+const BIG_CHANGE_PCT = 35;     // ask for a second tap when the weight is this far from the last/full weight
+function rawWeight() { const v = parseFloat(String($('weightInput').value).replace(',', '.')); return isFinite(v) ? v : NaN; }
+function currentWeight() { const v = rawWeight(); return v > 0 && v < KG_LIMIT ? Math.round(v * 1000) : v; }
 
 function update() {
   const t = state.data.trays[state.idx];
@@ -359,16 +363,27 @@ function update() {
   $('irrNo').className = state.irrigated === false ? 'on-no' : '';
 
   const rootErr = rootProblem();
+  const ref = t.lastWeight > 0 ? t.lastWeight : (full > 0 ? full : null);
+  const change = (ref && w > 0) ? Math.abs(w - ref) / ref * 100 : 0;
+  state.bigChange = change > BIG_CHANGE_PCT;
   const ok = w > 0 && w <= 100000 && state.irrigated !== null && !rootErr && !state.saving;
+  $('saveBtn').innerHTML = state.saving ? $('saveBtn').innerHTML : (state.bigChange && !state.bigOk ? 'Check weight – tap to save anyway' : 'Save &amp; next ›');
+  $('saveBtn').style.background = state.bigChange && !state.bigOk ? 'var(--amber)' : '';
   $('saveBtn').disabled = !ok;
-  $('hint').textContent = rootErr || (w > 0 && state.irrigated === null ? 'Choose: irrigated or not' : '');
+  const raw = rawWeight();
+  $('hint').textContent = rootErr
+    || (state.bigChange ? '⚠ ' + Math.round(change) + '% different from ' + (t.lastWeight > 0 ? 'last' : 'full') + ' weight (' + g(ref) + ') – check the number'
+    : (raw > 0 && raw < KG_LIMIT ? 'Read as ' + g(w) + ' (typed in kg)'
+    : (w > 0 && state.irrigated === null ? 'Choose: irrigated or not' : '')));
 }
 
 function setCell(id, p) {
   const c = $(id), n = c.querySelector('.num');
+  n.style.color = '';
   if (p === null) { c.classList.add('none'); n.textContent = '—'; return; }
   c.classList.remove('none');
-  n.textContent = p >= 0 ? p.toFixed(1) + '%' : '+' + Math.abs(p).toFixed(1) + '%';
+  if (p >= 0) { n.textContent = p.toFixed(1) + '%'; }
+  else { n.innerHTML = '↑' + Math.abs(p).toFixed(1) + '%<span style="display:block;font-size:12px;font-weight:700">heavier</span>'; n.style.color = 'var(--blue)'; }
 }
 
 function rootValues() {
@@ -394,6 +409,7 @@ function rootProblem() {
 /* ---------------- save ---------------- */
 async function save() {
   if (state.saving) return;
+  if (state.bigChange && !state.bigOk) { state.bigOk = true; buzz([60, 60, 60]); update(); return; }
   const t = state.data.trays[state.idx];
   const w = Math.round(currentWeight() * 10) / 10;
   if (!(w > 0) || state.irrigated === null) return;
@@ -495,7 +511,7 @@ function updateBadge() {
 }
 
 /* ---------------- wire up ---------------- */
-$('weightInput').addEventListener('input', update);
+$('weightInput').addEventListener('input', () => { state.bigOk = false; update(); });
 $('weightInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('weightInput').blur(); if (!$('saveBtn').disabled) save(); } });
 $('irrYes').addEventListener('click', () => { state.irrigated = true; state.irrTouched = true; buzz(25); update(); });
 $('irrNo').addEventListener('click', () => { state.irrigated = false; state.irrTouched = true; buzz(25); update(); });
